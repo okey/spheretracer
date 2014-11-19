@@ -28,6 +28,9 @@ mod sceneio;
 mod shaders;
 
 
+static COLOUR_WIDTH:uint = 4;
+static VERTEX_WIDTH:uint = 2;
+
 fn make_gl_proj_mat(width: uint, height: uint) -> [GLfloat, ..16] {
   let mut m:[GLfloat, ..16] = [0.0, ..16];
   let w = width as f32;
@@ -85,11 +88,11 @@ fn gl_init_and_render(scene: &scene::Scene) {
   // Add a vertex at every pixel... seems to cause issues at any res other than 800x600
   // TODO try building a texture instead
   let mut vbo = 0;
-  let wy2 = wy * 2;
+  let wy2 = wy * VERTEX_WIDTH;
   let vertex_data_vec: Vec<GLfloat> = Vec::from_fn(wx * wy2, |n| {
     let x = n / wy2;
     let y = n % wy2;
-    let v = if y % 2 == 0 { x as f32 } else { (y / 2) as f32};
+    let v = if y % 2 == 0 { x as f32 } else { (y / VERTEX_WIDTH) as f32};
     v + 0.5
   });
   let vertex_data = vertex_data_vec.as_slice();
@@ -97,9 +100,9 @@ fn gl_init_and_render(scene: &scene::Scene) {
   
   // Add a colour for each vertex
   let mut cbo = 0;
-  let wy4 = wy2 * 2;
+  let wy4 = wy * COLOUR_WIDTH;
   let mut colour_data_vec: Vec<GLfloat> = Vec::from_fn(wx * wy4, |n| {
-    match n % 4 {
+    match n % COLOUR_WIDTH {
       0 => (scene.background.red as f32   / 255.0) as GLfloat,
       1 => (scene.background.green as f32 / 255.0) as GLfloat,
       2 => (scene.background.blue as f32  / 255.0) as GLfloat,
@@ -107,7 +110,6 @@ fn gl_init_and_render(scene: &scene::Scene) {
     }
   });
   let colour_data = colour_data_vec.as_mut_slice();
-  println!("{}", colour_data[wx * wy4 - 8..]);
 
   unsafe {
     // Create Vertex Array Object
@@ -138,7 +140,7 @@ fn gl_init_and_render(scene: &scene::Scene) {
     let pos_attr = "position".with_c_str(|ptr| gl::GetAttribLocation(program, ptr));
     gl::EnableVertexAttribArray(pos_attr as GLuint);
     gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
-    gl::VertexAttribPointer(pos_attr as GLuint, 2, gl::FLOAT,
+    gl::VertexAttribPointer(pos_attr as GLuint, VERTEX_WIDTH as i32, gl::FLOAT,
                             gl::FALSE as GLboolean, 0, ptr::null());
 
 
@@ -154,7 +156,7 @@ fn gl_init_and_render(scene: &scene::Scene) {
     let col_attr = "vertex_colour".with_c_str(|ptr| gl::GetAttribLocation(program, ptr));
     gl::EnableVertexAttribArray(col_attr as GLuint);
     gl::BindBuffer(gl::ARRAY_BUFFER, cbo);
-    gl::VertexAttribPointer(col_attr as GLuint, 4, gl::FLOAT,
+    gl::VertexAttribPointer(col_attr as GLuint, COLOUR_WIDTH as i32, gl::FLOAT,
                             gl::FALSE as GLboolean, 0, ptr::null());
   }
 
@@ -225,7 +227,7 @@ fn intersect_unit_sphere(u: Vec4, v: Vec4) -> (bool, f64, f64) {
   let t1 = if b > 0.0 { (-b - p) / (2.0 * a) } else { (-b + p) / (2.0 * a) };
   let t2 = c / (a * t1);
   
-  (true, 0.0, 0.0)
+  (true, t1, t2)
 }
 
 // scene space => 1 ray per pixel(vertex), right handed system, but with 0,0 in the centre
@@ -235,11 +237,11 @@ fn render(scene: &scene::Scene, colour_data: &mut [GLfloat], progress: uint) -> 
   let wx = scene.image_size.val0() as int;
   let wy = scene.image_size.val1() as int;
 
-  let row = progress as int / (4 * wy);
-  let col = (progress as int % (4 * wy)) / 4;
+  let row = progress as int / (COLOUR_WIDTH as int * wy);
+  let col = (progress as int % (COLOUR_WIDTH as int * wy)) / COLOUR_WIDTH as int;
 
-  let hx = (wx / 2);
-  let hy = (wy / 2);
+  let hx = wx / 2;
+  let hy = wy / 2;
 
   // Let our screen in object space be -1*wx/wy,-1,1 to 1*wx/wy,1,1
   // ray start
