@@ -207,7 +207,7 @@ type TestOpt = Option<(f64, f64)>;
 type HitS<'a> = (&'a scene::Sphere, f64, f64);
 type HitSOpt<'a> = Option<HitS<'a>>;
 
-fn intersect_unit_sphere(u: &Vec4, v: &Vec4) -> TestOpt {
+fn intersect_fixed_sphere(u: &Vec4, v: &Vec4, r: f64) -> TestOpt {
   // TODO perf these are the same for each object for a ray, so could manually cache them
   let uu = dot(u, u);
   let uv = dot(u, v);
@@ -215,7 +215,7 @@ fn intersect_unit_sphere(u: &Vec4, v: &Vec4) -> TestOpt {
   
   let a = vv;
   let b = 2.0 * uv;
-  let c = uu - 1.0;
+  let c = uu - r * r;
 
   let ac4 = a * c * 4.0;
   let bsq =  b * b;
@@ -244,7 +244,7 @@ fn intersect_sphere<'a>(sphere: &'a scene::Sphere,  u: &Vec4, v: &Vec4) -> HitSO
     println!("'{} {}", uprime, vprime);
   }}
 
-  match intersect_unit_sphere(&uprime, &vprime) {
+  match intersect_fixed_sphere(&uprime, &vprime, sphere.radius) {
     Some(t) => Some((sphere, t.val0(), t.val1())),
     _ => None
   }
@@ -306,8 +306,10 @@ fn render_step(scene: &scene::Scene, colour_data: &mut [GLfloat], progress: uint
   }*/
 
   
-  unsafe { debug = row == 400 && col == 300; }
+  //unsafe { debug = row == hx && col == hy; }
   let colour = trace_ray(scene, &u, &v);
+  // TODO cleaner way to do this
+  // TODO freeze scene after IO
   colour_data[progress] = colour.red as f32 / 255.0;
   colour_data[progress + 1] = colour.green as f32 / 255.0;
   colour_data[progress + 2] = colour.blue as f32 / 255.0;
