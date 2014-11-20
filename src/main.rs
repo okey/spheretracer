@@ -335,7 +335,9 @@ fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4) -> Colour {
     let ni = scale_by(&n_hat, 2.0 * dot(&i_hat, &n_hat));
     let r_hat = sub(&i_hat, &ni);
 
-    let phong_scale = std::num::pow(dot(&v_hat, &r_hat), sphere.inner.phong_n as uint);
+    let rv = dot(&v_hat, &r_hat);
+    let real_rv = if rv < 0.0 { 0.0 } else { rv };
+    let phong_scale = std::num::pow(real_rv, sphere.inner.phong_n as uint);
     let phong_light = colour::colour_scale(&light.colour, phong_scale as f32);
     let phong_part  = colour::colour_multiply(&phong_light, phong); // could also be extracted
     result_colour = colour::colour_add(&result_colour, &phong_part);
