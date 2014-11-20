@@ -56,6 +56,28 @@ pub fn transform_multiply(t: &mat4::Matrix, v: &Vec4) -> Vec4{
   w
 }
 
+pub fn add(a: &Vec4, b: &Vec4) -> Vec4 {
+  Vec4 { x: a.x + b.x,
+           y: a.y + b.y,
+           z: a.z + b.z,
+           w: if a.w + b.w == 1.0 { 1.0 } else { 0.0 } }
+  // vector + vector = vector
+  // vector + point  = point
+  // point  + point  = ??? but let's assume a vector for now
+}
+
+pub fn sub(a: &Vec4, b: &Vec4) -> Vec4 {
+  Vec4 { x: a.x - b.x,
+           y: a.y - b.y,
+           z: a.z - b.z,
+           w: if a.w + b.w == 1.0 { 1.0 } else { 0.0 } }
+}
+
+pub fn parametric_position(u: &Vec4, v: &Vec4, t: f64) -> Vec4{
+  let scaled_dir = scale_by(v, t);
+  add(u, &scaled_dir)
+}
+
 pub fn dot(v: &Vec4, w: &Vec4) -> f64 {
   v.x * w.x + v.y * w.y + v.z * w.z
 }
@@ -75,4 +97,13 @@ pub fn scale_by(v: &Vec4, f: f64) -> Vec4 {
 pub fn as_divisor(f: f64, v: &Vec4) -> Vec4 {
   Vec4 { x: f / v.x, y: f / v.y, z: f / v.z, w: v.w }
 }
+
+pub fn as_vector(v: &Vec4) -> Vec4 {
+  vector4!(v.x v.y v.z 0.0)
+}
+
+pub fn as_point(v: &Vec4) -> Vec4 {
+  vector4!(v.x v.y v.z 1.0)
+}
+
 // TODO dot, cross, normalise, magnitude, maybe some inplace ops or macros for speed

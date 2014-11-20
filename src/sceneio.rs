@@ -7,6 +7,7 @@ use std::fmt;
 use mat4;
 use vec4;
 use vec4::Vec4;
+use colour;
 use colour::Colour;
 use scene::{Scene,Light,Material,Sphere,make_colour,make_material};
 
@@ -68,8 +69,8 @@ pub fn read_scene(filename: &Path) -> ParseResult {
   // TODO use defaults properly
   let mut scene = Scene {
     image_size: (1, 2),
-    ambient: colour!(0 0 0),
-    background: colour!(255 255 255),
+    ambient: colour::WHITE,
+    background: colour::BLACK,
     lights: Vec::new(),
     spheres: Vec::new()
   };
@@ -102,6 +103,7 @@ pub fn read_scene(filename: &Path) -> ParseResult {
 
     let s = tokens[0];
     match s {
+      // TODO abstract colour type a bit
       // Scene properties
       // Not using guards since we check the result after parsing anyway?
       // And it gives correct invalidity errors without extra effort
@@ -119,7 +121,7 @@ pub fn read_scene(filename: &Path) -> ParseResult {
 
       "background" => {
         in_object = false;
-        let vals: Vec<f64> = tokens.tail().iter().filter_map(|&s| from_str::<f64>(s)).collect();
+        let vals: Vec<f32> = tokens.tail().iter().filter_map(|&s| from_str::<f32>(s)).collect();
 
         scene.background = match vals.len() {
           3 => make_colour(vals.as_slice()),
@@ -129,7 +131,7 @@ pub fn read_scene(filename: &Path) -> ParseResult {
 
       "ambient" => {
         in_object = false;
-        let vals: Vec<f64> = tokens.tail().iter().filter_map(|&s| from_str::<f64>(s)).collect();
+        let vals: Vec<f32> = tokens.tail().iter().filter_map(|&s| from_str::<f32>(s)).collect();
 
         scene.ambient = match vals.len() {
           3 => make_colour(vals.as_slice()),
@@ -139,12 +141,15 @@ pub fn read_scene(filename: &Path) -> ParseResult {
 
       "light" => {
         in_object = false;
-        let vals: Vec<f64> = tokens.tail().iter().filter_map(|&s| from_str::<f64>(s)).collect();
+        let p: Vec<f64> = tokens.tail().iter()
+          .take(3).filter_map(|&s| from_str::<f64>(s)).collect();
+        let c: Vec<f32> = tokens.tail().iter()
+          .skip(3).filter_map(|&s| from_str::<f32>(s)).collect();
 
-        match vals.len() {
+        match p.len() + c.len() {
           6 => {
-            let pslice = vals.slice_to(3);
-            let cslice = vals.slice_from(3);
+            let pslice = p.as_slice();
+            let cslice = c.as_slice();
             let light = Light { position: point!(pslice), colour: make_colour(cslice) };
             scene.lights.push(light);
 
@@ -177,7 +182,7 @@ pub fn read_scene(filename: &Path) -> ParseResult {
       // Object properties
       "inner"     if in_object && n == 11 => {
         // slice_or_fail(&1u, &10u) is pretty ugly but more stable?
-        let colours: Vec<f64> = tokens[1..10].iter().filter_map(|&s| from_str::<f64>(s)).collect();
+        let colours: Vec<f32> = tokens[1..10].iter().filter_map(|&s| from_str::<f32>(s)).collect();
         let phong_n =  match from_str::<u8>(tokens[10]) {
           Some(val) => val,
           _ => return Err(ParseError { kind: InvalidLine, desc: ls.clone(),
@@ -201,7 +206,7 @@ pub fn read_scene(filename: &Path) -> ParseResult {
 
       // TODO put in a function and use try! ?
       "outer"     if in_object && n == 11 => {
-        let colours: Vec<f64> = tokens[1..10].iter().filter_map(|&s| from_str::<f64>(s)).collect();
+        let colours: Vec<f32> = tokens[1..10].iter().filter_map(|&s| from_str::<f32>(s)).collect();
         let phong_n =  match from_str::<u8>(tokens[10]) {
           Some(val) => val,
           _ => return Err(ParseError { kind: InvalidLine, desc: ls.clone(),

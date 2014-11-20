@@ -2,6 +2,7 @@
 use std::fmt;
 
 use colour::Colour;
+use colour::clamp;
 use mat4;
 use vec4::Vec4;
 
@@ -72,18 +73,11 @@ macro_rules! sphere(
     };
 )
 
-
-fn clamp_convert(x: f64) -> u8 {
-    let clamped = if x > 1f64 { 1f64 } else if x < 0f64 { 0f64 } else { x };
-    (clamped * 255f64) as u8
+pub fn make_colour(v: &[f32]) -> Colour { // what about using a macro for consistency?
+  assert!(v.len() == 3);
+  colour!(v)
 }
 
-pub fn make_colour(v: &[f64]) -> Colour { // what about using a macro for consistency?
-    assert!(v.len() == 3);
-    let converted: Vec<u8> = v.iter().map(|&f| clamp_convert(f)).collect();
-    colour!(converted)
-}
-
-pub fn make_material(d: &[f64], m: &[f64], p: &[f64], n: u8) -> Material {
+pub fn make_material(d: &[f32], m: &[f32], p: &[f32], n: u8) -> Material {
     Material { diffuse: make_colour(d), mirror: make_colour(m), phong: make_colour(p), phong_n: n }
 }

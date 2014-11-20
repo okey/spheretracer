@@ -13,7 +13,9 @@ use gl::types::*;
 use glfw::Context;
 
 use sceneio::read_scene;
-use vec4::{Vec4,dot,transform_multiply};
+// todo fix namespace
+use mat4::transpose;
+use vec4::{Vec4,dot,add,sub,normalise,parametric_position,transform_multiply,as_vector,as_point};
 use colour::Colour;
 use scene::{Sphere,Material};
 
@@ -250,15 +252,16 @@ fn intersect_sphere<'a>(sphere: &'a scene::Sphere,  u: &Vec4, v: &Vec4) -> HitSO
   }
 }
 
-// TODO recursion depth
 fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4) -> Colour {
+  // TODO if recurse depth reached return BLACK
+
   // get sphere with max intersection less than (in front of) u.z
   // t will be negative if the hit is behind u
 
   // would be cleaner but less mathematically correct to return only nearest +ve t further down
   let hits: Vec<HitS> = scene.spheres.iter()
-    .filter_map(|s| intersect_sphere(s, u, v))
-    .filter(|h| h.val1() >= 0.0 || h.val2() >= 0.0)
+    .filter_map(|s| intersect_sphere(s, u, v)) // if we intersect
+    .filter(|h| h.val1() >= 0.0 || h.val2() >= 0.0) // if we intersect within view
     .collect::<Vec<HitS>>();
   
   let fake_s = sphere!();
@@ -266,12 +269,47 @@ fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4) -> Colour {
   let hit = hits.iter()
     .fold(fake_h, |s, h| { if h.val1().min(h.val2()) < s.val1().min(s.val2()) { *h } else { s }});
 
-  if hit.val1() == fake_h.val1() && hit.val2() == fake_h.val2() {
-    return scene.background;
-    //return colour::BLACK;
+  // double check my logic
+  assert!(hits.len() != 0  || (hit.val1() == fake_h.val1() && hit.val2() == fake_h.val2()));
+  
+  if hits.len() == 0 { return scene.background }
+
+  let t1 = hit.val1();
+  let t2 = hit.val2();
+  let sphere = &hit.val0();
+  let t = if t1 >= 0.0 && t2 >= 0.0 { t1.min(t2) } else if t1 >= 0.0 { t1 } else { t2 };
+
+  let hit_u = parametric_position(u, v, t);
+  let hit_v = normalise(&sub(u, &hit_u)); // this is just unit(-v)
+  let n_hat = transform_multiply(&transpose(&sphere.inverse_t), &hit_u);
+
+  let diffuse = &sphere.inner.diffuse;
+  // let ka = 1.0 therefore we do not scale the ambience further
+  // scale colour by the intensity and colour of ambience
+  let mut result_colour = colour::colour_multiply(diffuse, &scene.ambient);
+  
+    
+  // let kd = 1.0
+  // therefore for each light add I[j]*n*i 
+  
+  for light in scene.lights.iter() {
+    let i_hat = normalise(&sub(&light.position, &hit_u));// unit vector in direction of light source
+    let light_term = colour::colour_scale(&light.colour, dot(&n_hat, &i_hat) as f32);
+    let part_colour = colour::colour_multiply(&light_term, diffuse);// TODO can't I extract this op?
+    result_colour = colour::colour_add(&result_colour, &part_colour);
   }
 
-  return hit.val0().inner.diffuse;
+
+  // TODO diffuse illumination with ambient
+  // TODO diffuse illumination with light sources
+  // TODO phong illumination
+  // TODO shadows
+  // TODO soft shadows (light sampling)
+  // TODO reflection with bounded recursion
+  // TODO transparency
+  // TODO inner/outer hits and materials
+
+  return result_colour;
 }
 
 // scene space => 1 ray per pixel(vertex), right handed system, but with 0,0 in the centre
@@ -297,22 +335,15 @@ fn render_step(scene: &scene::Scene, colour_data: &mut [GLfloat], progress: uint
   // this is always the same, could cache it
   let dz = -1.0; // cleaner than using 0.0-1.0 to get macro to work
   let v = vector!(0.0 0.0 dz);
-
-  /*let result = intersect_unit_sphere(&u, &v);
-
-  if result != None {
-    colour_data[progress] = 1.0;
-    colour_data[progress + 2] = 0.0;
-  }*/
-
   
   //unsafe { debug = row == hx && col == hy; }
   let colour = trace_ray(scene, &u, &v);
-  // TODO cleaner way to do this
-  // TODO freeze scene after IO
-  colour_data[progress] = colour.red as f32 / 255.0;
-  colour_data[progress + 1] = colour.green as f32 / 255.0;
-  colour_data[progress + 2] = colour.blue as f32 / 255.0;
+  // TODO freeze scene after IO??
+  colour_data[progress] = colour.red;
+  colour_data[progress + 1] = colour.green;
+  colour_data[progress + 2] = colour.blue;
+
+  // TODO antialiasing
 
   progress + 4
 }

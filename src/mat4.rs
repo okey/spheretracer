@@ -52,7 +52,7 @@ pub fn multiply(a: &Matrix, b: &Matrix) -> Matrix {
     }
     result
 }
-
+*/
 pub fn transpose(a: &Matrix) -> Matrix {
     let mut result = zero();
     for row in range(0, DIM) {
@@ -61,7 +61,7 @@ pub fn transpose(a: &Matrix) -> Matrix {
         }
     }
     result
-}*/
+}
 
 pub fn translate(v: &Vec4) -> Matrix {
     let mut result = identity();
