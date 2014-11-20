@@ -6,17 +6,16 @@
 extern crate gl;
 extern crate glfw;
 
-use std::os;
+use std::{os,mem,ptr};
 use std::path::Path;
 
 use gl::types::*;
 use glfw::Context;
 
-use std::mem;
-use std::ptr;
-
 use sceneio::read_scene;
-use vec4::{Vec4,dot};
+use vec4::{Vec4,dot,transform_multiply};
+use colour::Colour;
+use scene::{Sphere,Material};
 
 // module definition order matters for macro exports!
 mod colour;
@@ -163,7 +162,7 @@ fn gl_init_and_render(scene: &scene::Scene) {
   let mut progress = 0;
   println!("starting loop");
   while progress < colour_data.len() {
-    progress = render(scene, colour_data, progress);
+    progress = render_step(scene, colour_data, progress);
   }
   println!("done");
   
@@ -204,10 +203,15 @@ fn gl_init_and_render(scene: &scene::Scene) {
 // 
 //}
 
-fn intersect_unit_sphere(u: Vec4, v: Vec4) -> (bool, f64, f64) {
-  let uu = dot(&u, &u);
-  let uv = dot(&u, &v);
-  let vv = dot(&v, &v);
+type TestOpt = Option<(f64, f64)>;
+type HitS<'a> = (&'a scene::Sphere, f64, f64);
+type HitSOpt<'a> = Option<HitS<'a>>;
+
+fn intersect_unit_sphere(u: &Vec4, v: &Vec4) -> TestOpt {
+  // TODO perf these are the same for each object for a ray, so could manually cache them
+  let uu = dot(u, u);
+  let uv = dot(u, v);
+  let vv = dot(v, v);
   
   let a = vv;
   let b = 2.0 * uv;
@@ -219,7 +223,7 @@ fn intersect_unit_sphere(u: Vec4, v: Vec4) -> (bool, f64, f64) {
   if bsq <= ac4 {
     // < no real roots; miss
     // = 1  real root ; ray is tangent to sphere; treat as miss
-    return (false, 0.0, 0.0)
+    return None
   }
 
   let p = (bsq -  ac4).sqrt();
@@ -227,13 +231,53 @@ fn intersect_unit_sphere(u: Vec4, v: Vec4) -> (bool, f64, f64) {
   let t1 = if b > 0.0 { (-b - p) / (2.0 * a) } else { (-b + p) / (2.0 * a) };
   let t2 = c / (a * t1);
   
-  (true, t1, t2)
+  Some((t1, t2))
+}
+
+static mut debug: bool = false;
+fn intersect_sphere<'a>(sphere: &'a scene::Sphere,  u: &Vec4, v: &Vec4) -> HitSOpt<'a> {
+  let uprime = transform_multiply(&sphere.inverse_t, u);
+  let vprime = transform_multiply(&sphere.inverse_t, v);
+
+  unsafe { if debug {
+    println!("s{} {}", u, v);
+    println!("'{} {}", uprime, vprime);
+  }}
+
+  match intersect_unit_sphere(&uprime, &vprime) {
+    Some(t) => Some((sphere, t.val0(), t.val1())),
+    _ => None
+  }
+}
+
+// TODO recursion depth
+fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4) -> Colour {
+  // get sphere with max intersection less than (in front of) u.z
+  // t will be negative if the hit is behind u
+
+  // would be cleaner but less mathematically correct to return only nearest +ve t further down
+  let hits: Vec<HitS> = scene.spheres.iter()
+    .filter_map(|s| intersect_sphere(s, u, v))
+    .filter(|h| h.val1() >= 0.0 || h.val2() >= 0.0)
+    .collect::<Vec<HitS>>();
+  
+  let fake_s = sphere!();
+  let fake_h = (&fake_s, std::f64::MAX_VALUE, std::f64::MAX_VALUE);
+  let hit = hits.iter()
+    .fold(fake_h, |s, h| { if h.val1().min(h.val2()) < s.val1().min(s.val2()) { *h } else { s }});
+
+  if hit.val1() == fake_h.val1() && hit.val2() == fake_h.val2() {
+    return scene.background;
+    //return colour::BLACK;
+  }
+
+  return hit.val0().inner.diffuse;
 }
 
 // scene space => 1 ray per pixel(vertex), right handed system, but with 0,0 in the centre
 // so need to translate by w/2 and h/2, don't flip Z because we should already be in an RH system
 // and scale back to 2x2 plane
-fn render(scene: &scene::Scene, colour_data: &mut [GLfloat], progress: uint) -> uint {
+fn render_step(scene: &scene::Scene, colour_data: &mut [GLfloat], progress: uint) -> uint {
   let wx = scene.image_size.val0() as int;
   let wy = scene.image_size.val1() as int;
 
@@ -247,21 +291,26 @@ fn render(scene: &scene::Scene, colour_data: &mut [GLfloat], progress: uint) -> 
   // ray start
   let px = ((row - hx) as f64 + 0.5) / hy as f64;
   let py = ((col - hy) as f64 + 0.5) / hy as f64;
-  let pz = 1.0;
-  
+  let u = point!(px py 1.0);
+
   // ray direction
-  let dx = 0.0;
-  let dy = 0.0;
-  let dz = -1.0;
-  let d = vector!(dx dy dz);
-  let p = point!(px py pz);
+  // this is always the same, could cache it
+  let dz = -1.0; // cleaner than using 0.0-1.0 to get macro to work
+  let v = vector!(0.0 0.0 dz);
 
-  let result = intersect_unit_sphere(p, d);
+  /*let result = intersect_unit_sphere(&u, &v);
 
-  if result.val0() {
+  if result != None {
     colour_data[progress] = 1.0;
     colour_data[progress + 2] = 0.0;
-  }
+  }*/
+
+  
+  unsafe { debug = row == 400 && col == 300; }
+  let colour = trace_ray(scene, &u, &v);
+  colour_data[progress] = colour.red as f32 / 255.0;
+  colour_data[progress + 1] = colour.green as f32 / 255.0;
+  colour_data[progress + 2] = colour.blue as f32 / 255.0;
 
   progress + 4
 }

@@ -1,6 +1,10 @@
 #![macro_escape]
 use std::fmt;
 
+pub const BLACK: Colour = Colour { red: 0, green: 0, blue: 0 };
+pub const WHITE: Colour = Colour { red: 255, green: 255, blue: 255 };
+
+
 #[deriving(Clone)]
 pub struct Colour {
     pub red: u8,

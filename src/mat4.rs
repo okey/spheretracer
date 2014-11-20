@@ -3,7 +3,7 @@ use std::f64 as stdf64;
 
 use vec4::{Vec4,normalise};
 
-const DIM: uint = 4;
+pub const DIM: uint = 4;
 
 pub type Matrix = [[f64, ..DIM], ..DIM];
 // if I want to add traits for this I need to use a newtype... and then manually add all the inner type traits
