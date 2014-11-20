@@ -15,7 +15,7 @@ use glfw::Context;
 use sceneio::read_scene;
 // todo fix namespace
 use mat4::transpose;
-use vec4::{Vec4,dot,add,sub,normalise,parametric_position,transform_multiply,as_vector,as_point};
+use vec4::{Vec4,dot,add,sub,normalise,parametric_position,transform_multiply,as_vector,as_point,scale_by};
 use colour::Colour;
 use scene::{Sphere,Material};
 
@@ -201,10 +201,6 @@ fn gl_init_and_render(scene: &scene::Scene) {
   }
 }
 
-//fn trace(scene: &scene::Scene, ) -> Colour {
-// 
-//}
-
 type TestOpt = Option<(f64, f64)>;
 type HitS<'a> = (&'a scene::Sphere, f64, f64);
 type HitSOpt<'a> = Option<HitS<'a>>;
@@ -281,28 +277,70 @@ fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4) -> Colour {
 
   let hit_u = parametric_position(u, v, t);
   let hit_v = normalise(&sub(u, &hit_u)); // this is just unit(-v)
-  let n_hat = transform_multiply(&transpose(&sphere.inverse_t), &hit_u);
+  let n_hat = normalise(&transform_multiply(&transpose(&sphere.inverse_t), &as_vector(&hit_u)));
+  let v_hat = hit_v;//normalise(v); // not sure about this...
 
   let diffuse = &sphere.inner.diffuse;
+  let phong = &sphere.inner.phong;
   // let ka = 1.0 therefore we do not scale the ambience further
   // scale colour by the intensity and colour of ambience
   let mut result_colour = colour::colour_multiply(diffuse, &scene.ambient);
+
+
+  unsafe { if debug {
+    println!("\nn={} hv={}", n_hat, hit_v);
+  }}
   
-    
-  // let kd = 1.0
-  // therefore for each light add I[j]*n*i 
-  
+  // TODO break out functions for diffuse and phong
   for light in scene.lights.iter() {
-    let i_hat = normalise(&sub(&light.position, &hit_u));// unit vector in direction of light source
-    let light_term = colour::colour_scale(&light.colour, dot(&n_hat, &i_hat) as f32);
-    let part_colour = colour::colour_multiply(&light_term, diffuse);// TODO can't I extract this op?
-    result_colour = colour::colour_add(&result_colour, &part_colour);
+    // i_hat is a unit vector in direction of light source
+    let i_hat = normalise(&sub(&light.position, &hit_u));
+
+    // TODO function
+    // 0.001 is to fix cancer
+    let light_t = 10000.0;
+    let hits: Vec<HitS> = scene.spheres.iter()
+      .filter_map(|s| intersect_sphere(s, &hit_u, &i_hat))
+      .filter(|h|
+              ((h.val1() >= 0.001 && h.val1() < light_t) || 
+               (h.val2() >= 0.001 && h.val2() < light_t)))
+      .collect::<Vec<HitS>>();
+
+    unsafe { if debug {
+      println!("hits:{}", hits);
+    }}
+
+    if hits.len() > 0 { continue; } // in shadow
+
+    // Diffuse component
+    // let kd = 1.0
+    // therefore for each light add I[j]*n.i 
+    
+    let diff_light = colour::colour_scale(&light.colour, dot(&n_hat, &i_hat) as f32);
+    // could extract the following multiplication outside the loop if I slackened colour clamping
+    let diff_part = colour::colour_multiply(&diff_light, diffuse);
+    result_colour = colour::colour_add(&result_colour, &diff_part);
+
+    // Phong component
+    // let kp = 1.0
+    // therefore for each light add I[j]*(v.r)**n
+  
+    // r_hat is a unit vector of the light vector reflected about the normal
+    // r_hat = i_hat - 2*(i_hat.n_hat)*n_hat
+    let ni = scale_by(&n_hat, 2.0 * dot(&i_hat, &n_hat));
+    let r_hat = sub(&i_hat, &ni);
+
+    let phong_scale = std::num::pow(dot(&v_hat, &r_hat), sphere.inner.phong_n as uint);
+    let phong_light = colour::colour_scale(&light.colour, phong_scale as f32);
+    let phong_part  = colour::colour_multiply(&phong_light, phong); // could also be extracted
+    result_colour = colour::colour_add(&result_colour, &phong_part);
+
+    unsafe { if debug {
+      println!("\nr={} ni{}", r_hat, ni);
+    }}
   }
 
 
-  // TODO diffuse illumination with ambient
-  // TODO diffuse illumination with light sources
-  // TODO phong illumination
   // TODO shadows
   // TODO soft shadows (light sampling)
   // TODO reflection with bounded recursion
@@ -336,7 +374,7 @@ fn render_step(scene: &scene::Scene, colour_data: &mut [GLfloat], progress: uint
   let dz = -1.0; // cleaner than using 0.0-1.0 to get macro to work
   let v = vector!(0.0 0.0 dz);
   
-  //unsafe { debug = row == hx && col == hy; }
+  unsafe { debug = row == hx && col == hy; }
   let colour = trace_ray(scene, &u, &v);
   // TODO freeze scene after IO??
   colour_data[progress] = colour.red;
