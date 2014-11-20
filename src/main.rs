@@ -15,7 +15,7 @@ use glfw::Context;
 use sceneio::read_scene;
 // todo fix namespace
 use mat4::transpose;
-use vec4::{Vec4,dot,add,sub,normalise,parametric_position,transform_multiply,as_vector,as_point,scale_by};
+use vec4::{Vec4,dot,add,sub,normalise,parametric_position,transform_multiply,as_vector,as_point,scale_by,magnitude};
 use colour::Colour;
 use scene::{Sphere,Material};
 
@@ -294,16 +294,17 @@ fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4) -> Colour {
   // TODO break out functions for diffuse and phong
   for light in scene.lights.iter() {
     // i_hat is a unit vector in direction of light source
-    let i_hat = normalise(&sub(&light.position, &hit_u));
+    let i_vec = sub(&light.position, &hit_u);
+    let i_hat = normalise(&i_vec);
 
     // TODO function
-    // 0.001 is to fix cancer
-    let light_t = 10000.0;
+    // 0.0..1 is to fix cancer TODO apply when calculating u_hit
+    let light_t = magnitude(&i_vec);
     let hits: Vec<HitS> = scene.spheres.iter()
       .filter_map(|s| intersect_sphere(s, &hit_u, &i_hat))
       .filter(|h|
-              ((h.val1() >= 0.001 && h.val1() < light_t) || 
-               (h.val2() >= 0.001 && h.val2() < light_t)))
+              ((h.val1() >= 0.00001 && h.val1() < light_t) || 
+               (h.val2() >= 0.00001 && h.val2() < light_t)))
       .collect::<Vec<HitS>>();
 
     unsafe { if debug {
@@ -340,9 +341,7 @@ fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4) -> Colour {
     }}
   }
 
-
-  // TODO shadows
-  // TODO soft shadows (light sampling)
+  // TODO soft shadows (light sampling) -  use random sampling
   // TODO reflection with bounded recursion
   // TODO transparency
   // TODO inner/outer hits and materials
