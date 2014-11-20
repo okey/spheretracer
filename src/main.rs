@@ -163,21 +163,25 @@ fn gl_init_and_render(scene: &scene::Scene) {
 
   let mut progress = 0;
   println!("starting loop");
-  while progress < colour_data.len() {
-    progress = render_step(scene, colour_data, progress);
-  }
+  //while progress < colour_data.len() {
+  //  progress = render_step(scene, colour_data, progress);
+  //}
   println!("done");
+  let mut chunk = 0;
+  let chunk_size = wy * 4;
+  let max_chunk = colour_data.len() / chunk_size;
   
   // TODO fix crap performance by using streaming, mapping the buffer, or using framebuffers etc
   // need to somehow decouple/desync changing the pixels and pushing to GPU
   while !window.should_close() {
     glfw.poll_events();
-    unsafe {
+    
+    while chunk <= max_chunk && progress < chunk_size * chunk {
+      progress = render_step(scene, colour_data, progress);
+    }
+    chunk += 1;
 
-      /*if progress < colour_data.len() {
-        progress = render(scene, colour_data, progress);
-      }*/
-      
+    unsafe { 
       gl::BufferData(gl::ARRAY_BUFFER,
                      (colour_data.len() * mem::size_of::<GLfloat>()) as GLsizeiptr, 
                      mem::transmute(&colour_data[0]),
