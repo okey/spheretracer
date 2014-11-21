@@ -208,7 +208,7 @@ fn gl_init_and_render(scene: &scene::Scene) {
 }
 
 type TestOpt = Option<(f64, f64)>;
-type HitS<'a> = (&'a scene::Sphere, f64, Vec4); // should be a struct at this point
+type HitS<'a> = (&'a scene::Sphere, f64, Vec4, bool); // REALLY should be a struct at this point
 type HitSOpt<'a> = Option<HitS<'a>>;
 
 fn intersect_fixed_sphere(u: &Vec4, v: &Vec4, r: f64) -> TestOpt {
@@ -250,14 +250,14 @@ fn intersect_sphere<'a>(sphere: &'a scene::Sphere,  u: &Vec4, v: &Vec4) -> HitSO
       
       // Consider the ray to have missed if an intersection is behind the ray's start position
       // Only return the nearest (non -ve) intersection with this object
-      let t = if t1 >= 0.0 && t2 >= 0.0 { t1.min(t2) }
-      else if t1 >= 0.0 { t1 }
-      else if t2 >= 0.0 { t2 }
+      let (t, outside) = if t1 >= 0.0 && t2 >= 0.0 { (t1.min(t2), true) }
+      else if t1 >= 0.0 { (t1, false) }
+      else if t2 >= 0.0 { (t2, false) }
       else { return None };
 
       let h = vec4::parametric_position(&uprime, &vprime, t);
       
-      Some((sphere, t, h))
+      Some((sphere, t, h, outside))
     },
     _ => None
   }
@@ -282,19 +282,20 @@ fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4, depth: uint) -> Colour {
   
   // Take the closest hit and extract
   let fake_s = sphere!();
-  let fake_h = (&fake_s, std::f64::MAX_VALUE, vector!());
+  let fake_h = (&fake_s, std::f64::MAX_VALUE, vector!(), false);
   let hit = hits.iter().fold(fake_h, |s, h| { if h.val1() < s.val1() { *h } else { s }});
 
   let sphere = &hit.val0();
   let t = hit.val1();
+  let material = if hit.val3() { sphere.outer } else { sphere.inner };
   
   let hit_u = vec4::parametric_position(u, v, t * 0.9999);
   let hit_v = (*u - hit_u).normalise();
   let n_hat = hit.val2().as_vector().transform(&mat4::transpose(&sphere.inverse_t)).normalise();
   let v_hat = hit_v;
 
-  let diffuse = &sphere.inner.diffuse;
-  let phong = &sphere.inner.phong;
+  let diffuse = &material.diffuse;
+  let phong = &material.phong;
   // let ka = 1.0 therefore we do not scale the ambience further
   // scale colour by the intensity and colour of ambience
   let mut result_colour = colour::colour_multiply(diffuse, &scene.ambient);
@@ -332,12 +333,11 @@ fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4, depth: uint) -> Colour {
         // Jitter the light position by +/-0.5 * coeff in each axis to model lights with area
         let jit_i_vec = light.position.apply(|c| c + (rng() - 0.5) * SOFT_SHADOW_COEFF) - hit_u;
         
-        // TODO correct light t bounding
         // It's a shame that using scan to avoid mutable state makes this harder to read
         let mut blocked = false;
         for s in scene.spheres.iter() {
           if let Some(h) = intersect_sphere(s, &hit_u, &jit_i_vec) {
-            if h.val1() >= 0.0 {
+            if h.val1() >= 0.0 && h.val1() < 1.0 { // 1.0 because jit_i_vec is not normalised
               blocked = true;
               break;
             }
@@ -384,20 +384,20 @@ fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4, depth: uint) -> Colour {
     let rv = v_hat.dot(&r_hat) * soften_scale;
 
     if rv > 0.0 {
-      let phong_scale = std::num::pow(rv, sphere.inner.phong_n as uint);
+      let phong_scale = std::num::pow(rv, material.phong_n as uint);
       let phong_light = colour::colour_scale(&light.colour, phong_scale as f32);
       let phong_part  = colour::colour_multiply(&phong_light, phong); // could also be extracted
       result_colour = colour::colour_add(&result_colour, &phong_part);
     }
   }
 
-  if !colour::colour_eq(&colour::BLACK, &sphere.inner.mirror) {
+  if !colour::colour_eq(&colour::BLACK, &material.mirror) {
     let reflected_u = hit_u;
     //let reflected_v = normalise(&sub(&scale_by(&n_hat, 2.0 * dot(&v_hat, &n_hat)), &v_hat));
     let reflected_v = (n_hat * (2.0 * v_hat.dot(&n_hat)) - v_hat).normalise();
     let reflected_c = trace_ray(scene, &reflected_u, &reflected_v, depth - 1);
 
-    let mirror_part = colour::colour_multiply(&sphere.inner.mirror, &reflected_c);
+    let mirror_part = colour::colour_multiply(&material.mirror, &reflected_c);
     result_colour = colour::colour_add(&result_colour, &mirror_part);
   }
 
