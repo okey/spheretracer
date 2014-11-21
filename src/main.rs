@@ -6,7 +6,7 @@
 extern crate gl;
 extern crate glfw;
 
-use std::{os,mem,ptr};
+use std::{os,mem,ptr,rand};
 use std::path::Path;
 
 use gl::types::*;
@@ -261,8 +261,13 @@ fn intersect_sphere<'a>(sphere: &'a scene::Sphere,  u: &Vec4, v: &Vec4) -> HitSO
   }
 }
 
-fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4) -> Colour {
-  // TODO if recurse depth reached return BLACK
+
+const SOFT_SHADOW_SAMPLES: uint = 1;
+const SOFT_SHADOW_COEFF: f64 = 0.05;
+
+fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4, depth: uint) -> Colour {
+  // Stop mirror ray recursion
+  if depth == 0 { return colour::BLACK; }
 
   // Find all objects that lie in the path of the ray for non -ve t
   let hits = scene.spheres.iter()
@@ -293,30 +298,85 @@ fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4) -> Colour {
   // scale colour by the intensity and colour of ambience
   let mut result_colour = colour::colour_multiply(diffuse, &scene.ambient);
   
+  
+  // TODO cache and pass ref to this
+  let rng = rand::random::<f64>;
+  
   // TODO break out functions for diffuse and phong
   for light in scene.lights.iter() {
-    // i_vec kept to take magnitude later
+
+    // i_vec kept to take magnitude later TODO fixme
     let i_vec = sub(&light.position, &hit_u);
     // i_hat is a unit vector in direction of light source
     let i_hat = normalise(&i_vec);
+    
+    let mut visible_samples:uint = 0;
+    
+    // maybe a different distribution would look better?
+    if SOFT_SHADOW_SAMPLES == 1 { // no sampling
+      
+      let light_t = magnitude(&i_vec);
+      
+      // Would be quicker if we stopped on hit
+      let hits = scene.spheres.iter()
+        .filter_map(|s| intersect_sphere(s, &hit_u, &i_hat))
+        .filter(|h| h.val1() < light_t) // intersections beyond the light don't block it
+        .collect::<Vec<HitS>>();
 
-    let light_t = magnitude(&i_vec);
-    let hits = scene.spheres.iter()
-      .filter_map(|s| intersect_sphere(s, &hit_u, &i_hat))
-      .filter(|h| h.val1() < light_t) // intersections beyond the light don't block it
-      .collect::<Vec<HitS>>();
+      if hits.len() > 0 { continue; } // in shadow
+      visible_samples = SOFT_SHADOW_SAMPLES; // so that the softening factor is 1
+    } else {
+      
+      for sample in range(0, SOFT_SHADOW_SAMPLES) { // random sampling
+        // Jitter the light position by +/-0.5 * coeff in each axis to model lights with area
+        let jit_pos = Vec4 {
+          x: light.position.x + (rng() - 0.5) * SOFT_SHADOW_COEFF,
+          y: light.position.y + (rng() - 0.5) * SOFT_SHADOW_COEFF,
+          z: light.position.z + (rng() - 0.5) * SOFT_SHADOW_COEFF,
+          w: 0.0
+        };
+        
+        let jit_i_vec = sub(&jit_pos, &hit_u);
+        
+        // TODO is there a better functional equivalent?
+        let blocked= scene.spheres.iter()
+          .scan(false, |fail, s| {
+            if *fail { return None::<bool> }
 
-    unsafe { if debug {
-      println!("hits:{}", hits);
-    }}
+            match intersect_sphere(s, &hit_u, &jit_i_vec) {
+              Some(h) if h.val1() >= 0.0 && h.val1() <= 1.0 => { // not sure about this bounding...
+                *fail = true;
+                return Some(true)
+              },
+              _ => return None
+            }
+          }).collect::<Vec<bool>>().len() != 0;
 
-    if hits.len() > 0 { continue; } // in shadow
+        /*
+        // Iterative version:
+        let mut blocked = false;
+        for s in scene.spheres.iter() {
+          match intersect_sphere(s, &hit_u, &jit_i_vec) {
+            Some(h) if h.val1() >= 0.0 && h.val1() <= 1.0 => { 
+              blocked = true;
+              break;
+            },
+            _ => continue
+          }
+        }*/
+
+        if !blocked { visible_samples += 1; }
+      }
+    }
+    if visible_samples == 0 { continue; } // in shadow
+
+    let soften_scale = visible_samples as f64 / SOFT_SHADOW_SAMPLES as f64;
 
     // Diffuse component
     // let kd = 1.0
     // therefore for each light add I[j]*n.i 
     
-    let ni = dot(&n_hat, &i_hat);
+    let ni = dot(&n_hat, &i_hat) * soften_scale;
     if ni > 0.0 { 
       let diff_light = colour::colour_scale(&light.colour, ni as f32);
       // could extract the following multiplication outside the loop if I slackened colour clamping
@@ -340,7 +400,7 @@ fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4) -> Colour {
       
     }}
 
-    let rv = dot(&v_hat, &r_hat);
+    let rv = dot(&v_hat, &r_hat) * soften_scale;
 
     if rv > 0.0 {
       let phong_scale = std::num::pow(rv, sphere.inner.phong_n as uint);
@@ -350,7 +410,6 @@ fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4) -> Colour {
     }
   }
 
-  // TODO soft shadows (light sampling) -  use random sampling
   // TODO reflection with bounded recursion
   // TODO transparency
   // TODO inner/outer hits and materials
@@ -362,6 +421,7 @@ fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4) -> Colour {
 // so need to translate by w/2 and h/2, don't flip Z because we should already be in an RH system
 // and scale back to 2x2 plane
 fn render_step(scene: &scene::Scene, colour_data: &mut [GLfloat], progress: uint) -> uint {
+  let depth_max = 1;
   let wx = scene.image_size.val0() as int;
   let wy = scene.image_size.val1() as int;
 
@@ -383,7 +443,7 @@ fn render_step(scene: &scene::Scene, colour_data: &mut [GLfloat], progress: uint
   let v = vector!(0.0 0.0 dz);
   
   unsafe { debug = row == hx && col == hy; }
-  let colour = trace_ray(scene, &u, &v);
+  let colour = trace_ray(scene, &u, &v, depth_max);
   // TODO freeze scene after IO??
   colour_data[progress] = colour.red;
   colour_data[progress + 1] = colour.green;
