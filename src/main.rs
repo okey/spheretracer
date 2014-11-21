@@ -241,22 +241,19 @@ fn intersect_sphere<'a>(sphere: &'a scene::Sphere,  u: &Vec4, v: &Vec4) -> HitSO
   let uprime = transform_multiply(&sphere.inverse_t, u);
   let vprime = transform_multiply(&sphere.inverse_t, v);
 
-  unsafe { if debug {
-    println!("s{} {}", u, v);
-    println!("'{} {}", uprime, vprime);
-  }}
-
   match intersect_fixed_sphere(&uprime, &vprime, sphere.radius) {
     Some(x) => {
       let t1 = x.val0();
       let t2 = x.val1();
       
+      // Consider the ray to have missed if an intersection is behind the ray's start position
+      // Only return the nearest (non -ve) intersection with this object
       let t = if t1 >= 0.0 && t2 >= 0.0 { t1.min(t2) }
       else if t1 >= 0.0 { t1 }
       else if t2 >= 0.0 { t2 }
       else { return None };
 
-      let h = parametric_position(&uprime, &vprime, t * 0.9999);
+      let h = parametric_position(&uprime, &vprime, t);
       
       Some((sphere, t, h))
     },
@@ -267,55 +264,46 @@ fn intersect_sphere<'a>(sphere: &'a scene::Sphere,  u: &Vec4, v: &Vec4) -> HitSO
 fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4) -> Colour {
   // TODO if recurse depth reached return BLACK
 
-  // get sphere with max intersection less than (in front of) u.z
-  // t will be negative if the hit is behind u
-
-  // would be cleaner but less mathematically correct to return only nearest +ve t further down
+  // Find all objects that lie in the path of the ray for non -ve t
   let hits = scene.spheres.iter()
     .filter_map(|s| intersect_sphere(s, u, v)) // if we intersect
     .collect::<Vec<HitS>>();
   
+  // Could multiply this with the ambient if desired
   if hits.len() == 0 { return scene.background; }
   
-  // NORMAL needs to be in u' v' space then transpose transformed?? which should be untransformed
-  // but
-
+  
+  // Take the closest hit and extract
   let fake_s = sphere!();
   let fake_h = (&fake_s, std::f64::MAX_VALUE, vector!());
   let hit = hits.iter().fold(fake_h, |s, h| { if h.val1() < s.val1() { *h } else { s }});
 
-  // double check my logic
   let sphere = &hit.val0();
   let t = hit.val1();
   
-
   let hit_u = parametric_position(u, v, t * 0.9999);
-  let hit_v = normalise(&sub(u, &hit_u)); // this is just unit(-v)
+  let hit_v = normalise(&sub(u, &hit_u));
   let n_hat = normalise(&transform_multiply(&transpose(&sphere.inverse_t), 
                                             &as_vector(&hit.val2())));
-  let v_hat = hit_v;//normalise(v); // not sure about this...
+  let v_hat = hit_v;
 
   let diffuse = &sphere.inner.diffuse;
   let phong = &sphere.inner.phong;
   // let ka = 1.0 therefore we do not scale the ambience further
   // scale colour by the intensity and colour of ambience
   let mut result_colour = colour::colour_multiply(diffuse, &scene.ambient);
-
-
-  unsafe { if debug {
-    //println!("\nn={} hv={}", n_hat, hit_v);
-  }}
   
   // TODO break out functions for diffuse and phong
   for light in scene.lights.iter() {
-    // i_hat is a unit vector in direction of light source
+    // i_vec kept to take magnitude later
     let i_vec = sub(&light.position, &hit_u);
+    // i_hat is a unit vector in direction of light source
     let i_hat = normalise(&i_vec);
 
-    // TODO function
     let light_t = magnitude(&i_vec);
     let hits = scene.spheres.iter()
       .filter_map(|s| intersect_sphere(s, &hit_u, &i_hat))
+      .filter(|h| h.val1() < light_t) // intersections beyond the light don't block it
       .collect::<Vec<HitS>>();
 
     unsafe { if debug {
@@ -333,19 +321,17 @@ fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4) -> Colour {
       let diff_light = colour::colour_scale(&light.colour, ni as f32);
       // could extract the following multiplication outside the loop if I slackened colour clamping
       let diff_part = colour::colour_multiply(&diff_light, diffuse);
-      //result_colour = colour::colour_add(&result_colour, &diff_part);
+      result_colour = colour::colour_add(&result_colour, &diff_part);
     }
-
-    // TODO fix phong... behaves weirdly
 
     // Phong component
     // let kp = 1.0
     // therefore for each light add I[j]*(v.r)**n
   
-    // TODO extract reflection outside of lights loop
+    // TODO extract reflection outside of lights loop by changing which vector we reflect
     // r_hat is a unit vector of the light vector reflected about the normal
     // r_hat = i_hat - 2*(i_hat.n_hat)*n_hat
-    let n_perp2 = scale_by(&n_hat, 2.0 * dot(&i_hat, &n_hat));
+    let n_perp2 = scale_by(&n_hat, 2.0 * dot(&i_hat, &n_hat)); // scale factor TODO rename
     let r_hat = normalise(&sub(&n_perp2, &i_hat));
 
     unsafe { if debug {
