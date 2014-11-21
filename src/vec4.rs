@@ -58,9 +58,9 @@ pub fn transform_multiply(t: &mat4::Matrix, v: &Vec4) -> Vec4{
 
 pub fn add(a: &Vec4, b: &Vec4) -> Vec4 {
   Vec4 { x: a.x + b.x,
-           y: a.y + b.y,
-           z: a.z + b.z,
-           w: if a.w + b.w == 1.0 { 1.0 } else { 0.0 } }
+         y: a.y + b.y,
+         z: a.z + b.z,
+         w: if a.w + b.w == 1.0 { 1.0 } else { 0.0 } }
   // vector + vector = vector
   // vector + point  = point
   // point  + point  = ??? but let's assume a vector for now
