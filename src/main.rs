@@ -16,7 +16,7 @@ use sceneio::read_scene;
 // todo fix namespace
 use mat4::transpose;
 use vec4::{Vec4,dot,sub,normalise,parametric_position,transform_multiply,as_vector,scale_by,magnitude};
-use colour::{Colour,colour_clamp};
+use colour::{Colour};
 use scene::{Sphere,Material};
 
 // module definition order matters for macro exports!
@@ -410,18 +410,26 @@ fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4, depth: uint) -> Colour {
     }
   }
 
-  // TODO reflection with bounded recursion
+  if !colour::colour_eq(&colour::BLACK, &sphere.inner.mirror) {
+    let reflected_u = hit_u;
+    let reflected_v = normalise(&sub(&scale_by(&n_hat, 2.0 * dot(&v_hat, &n_hat)), &v_hat));
+    let reflected_c = trace_ray(scene, &reflected_u, &reflected_v, depth - 1);
+
+    let mirror_part = colour::colour_multiply(&sphere.inner.mirror, &reflected_c);
+    result_colour = colour::colour_add(&result_colour, &mirror_part);
+  }
+
   // TODO transparency
   // TODO inner/outer hits and materials
 
-  return colour_clamp(&result_colour);
+  return colour::colour_clamp(&result_colour);
 }
 
 // scene space => 1 ray per pixel(vertex), right handed system, but with 0,0 in the centre
 // so need to translate by w/2 and h/2, don't flip Z because we should already be in an RH system
 // and scale back to 2x2 plane
 fn render_step(scene: &scene::Scene, colour_data: &mut [GLfloat], progress: uint) -> uint {
-  let depth_max = 1;
+  let depth_max = 5;
   let wx = scene.image_size.val0() as int;
   let wy = scene.image_size.val1() as int;
 

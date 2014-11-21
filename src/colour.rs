@@ -56,6 +56,11 @@ pub fn colour_add(c: &Colour, d: &Colour) -> Colour {
   colour!(c.red+d.red c.green+d.green c.blue+d.blue)
 }
 
+// TODO EQ trait
+pub fn colour_eq(c: &Colour, d: &Colour) -> bool {
+  c.red == d.red && c.green == d.green && c.blue == d.blue
+}
+
 impl fmt::Show for Colour {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "#{:02X}{:02X}{:02X}",
