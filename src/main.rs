@@ -15,8 +15,8 @@ use glfw::Context;
 use sceneio::read_scene;
 // todo fix namespace
 use mat4::transpose;
-use vec4::{Vec4,dot,add,sub,normalise,parametric_position,transform_multiply,as_vector,as_point,scale_by,magnitude};
-use colour::Colour;
+use vec4::{Vec4,dot,sub,normalise,parametric_position,transform_multiply,as_vector,scale_by,magnitude};
+use colour::{Colour,colour_clamp};
 use scene::{Sphere,Material};
 
 // module definition order matters for macro exports!
@@ -206,7 +206,7 @@ fn gl_init_and_render(scene: &scene::Scene) {
 }
 
 type TestOpt = Option<(f64, f64)>;
-type HitS<'a> = (&'a scene::Sphere, f64, f64);
+type HitS<'a> = (&'a scene::Sphere, f64, Vec4); // should be a struct at this point
 type HitSOpt<'a> = Option<HitS<'a>>;
 
 fn intersect_fixed_sphere(u: &Vec4, v: &Vec4, r: f64) -> TestOpt {
@@ -247,7 +247,19 @@ fn intersect_sphere<'a>(sphere: &'a scene::Sphere,  u: &Vec4, v: &Vec4) -> HitSO
   }}
 
   match intersect_fixed_sphere(&uprime, &vprime, sphere.radius) {
-    Some(t) => Some((sphere, t.val0(), t.val1())),
+    Some(x) => {
+      let t1 = x.val0();
+      let t2 = x.val1();
+      
+      let t = if t1 >= 0.0 && t2 >= 0.0 { t1.min(t2) }
+      else if t1 >= 0.0 { t1 }
+      else if t2 >= 0.0 { t2 }
+      else { return None };
+
+      let h = parametric_position(&uprime, &vprime, t * 0.9999);
+      
+      Some((sphere, t, h))
+    },
     _ => None
   }
 }
@@ -259,29 +271,28 @@ fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4) -> Colour {
   // t will be negative if the hit is behind u
 
   // would be cleaner but less mathematically correct to return only nearest +ve t further down
-  let hits: Vec<HitS> = scene.spheres.iter()
+  let hits = scene.spheres.iter()
     .filter_map(|s| intersect_sphere(s, u, v)) // if we intersect
-    .filter(|h| h.val1() >= 0.0 || h.val2() >= 0.0) // if we intersect within view
     .collect::<Vec<HitS>>();
   
+  if hits.len() == 0 { return scene.background; }
+  
+  // NORMAL needs to be in u' v' space then transpose transformed?? which should be untransformed
+  // but
+
   let fake_s = sphere!();
-  let fake_h = (&fake_s, std::f64::MAX_VALUE, std::f64::MAX_VALUE);
-  let hit = hits.iter()
-    .fold(fake_h, |s, h| { if h.val1().min(h.val2()) < s.val1().min(s.val2()) { *h } else { s }});
+  let fake_h = (&fake_s, std::f64::MAX_VALUE, vector!());
+  let hit = hits.iter().fold(fake_h, |s, h| { if h.val1() < s.val1() { *h } else { s }});
 
   // double check my logic
-  assert!(hits.len() != 0  || (hit.val1() == fake_h.val1() && hit.val2() == fake_h.val2()));
-  
-  if hits.len() == 0 { return scene.background }
-
-  let t1 = hit.val1();
-  let t2 = hit.val2();
   let sphere = &hit.val0();
-  let t = if t1 >= 0.0 && t2 >= 0.0 { t1.min(t2) } else if t1 >= 0.0 { t1 } else { t2 };
+  let t = hit.val1();
+  
 
-  let hit_u = parametric_position(u, v, t);
+  let hit_u = parametric_position(u, v, t * 0.9999);
   let hit_v = normalise(&sub(u, &hit_u)); // this is just unit(-v)
-  let n_hat = normalise(&transform_multiply(&transpose(&sphere.inverse_t), &as_vector(&hit_u)));
+  let n_hat = normalise(&transform_multiply(&transpose(&sphere.inverse_t), 
+                                            &as_vector(&hit.val2())));
   let v_hat = hit_v;//normalise(v); // not sure about this...
 
   let diffuse = &sphere.inner.diffuse;
@@ -292,7 +303,7 @@ fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4) -> Colour {
 
 
   unsafe { if debug {
-    println!("\nn={} hv={}", n_hat, hit_v);
+    //println!("\nn={} hv={}", n_hat, hit_v);
   }}
   
   // TODO break out functions for diffuse and phong
@@ -302,13 +313,9 @@ fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4) -> Colour {
     let i_hat = normalise(&i_vec);
 
     // TODO function
-    // 0.0..1 is to fix cancer TODO apply when calculating u_hit
     let light_t = magnitude(&i_vec);
-    let hits: Vec<HitS> = scene.spheres.iter()
+    let hits = scene.spheres.iter()
       .filter_map(|s| intersect_sphere(s, &hit_u, &i_hat))
-      .filter(|h|
-              ((h.val1() >= 0.00001 && h.val1() < light_t) || 
-               (h.val2() >= 0.00001 && h.val2() < light_t)))
       .collect::<Vec<HitS>>();
 
     unsafe { if debug {
@@ -321,30 +328,40 @@ fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4) -> Colour {
     // let kd = 1.0
     // therefore for each light add I[j]*n.i 
     
-    let diff_light = colour::colour_scale(&light.colour, dot(&n_hat, &i_hat) as f32);
-    // could extract the following multiplication outside the loop if I slackened colour clamping
-    let diff_part = colour::colour_multiply(&diff_light, diffuse);
-    result_colour = colour::colour_add(&result_colour, &diff_part);
+    let ni = dot(&n_hat, &i_hat);
+    if ni > 0.0 { 
+      let diff_light = colour::colour_scale(&light.colour, ni as f32);
+      // could extract the following multiplication outside the loop if I slackened colour clamping
+      let diff_part = colour::colour_multiply(&diff_light, diffuse);
+      //result_colour = colour::colour_add(&result_colour, &diff_part);
+    }
+
+    // TODO fix phong... behaves weirdly
 
     // Phong component
     // let kp = 1.0
     // therefore for each light add I[j]*(v.r)**n
   
+    // TODO extract reflection outside of lights loop
     // r_hat is a unit vector of the light vector reflected about the normal
     // r_hat = i_hat - 2*(i_hat.n_hat)*n_hat
-    let ni = scale_by(&n_hat, 2.0 * dot(&i_hat, &n_hat));
-    let r_hat = sub(&i_hat, &ni);
-
-    let rv = dot(&v_hat, &r_hat);
-    let real_rv = if rv < 0.0 { 0.0 } else { rv };
-    let phong_scale = std::num::pow(real_rv, sphere.inner.phong_n as uint);
-    let phong_light = colour::colour_scale(&light.colour, phong_scale as f32);
-    let phong_part  = colour::colour_multiply(&phong_light, phong); // could also be extracted
-    result_colour = colour::colour_add(&result_colour, &phong_part);
+    let n_perp2 = scale_by(&n_hat, 2.0 * dot(&i_hat, &n_hat));
+    let r_hat = normalise(&sub(&n_perp2, &i_hat));
 
     unsafe { if debug {
-      println!("\nr={} ni{}", r_hat, ni);
+      println!("\nn={},n.i={},r={}", n_hat, dot(&i_hat, &n_hat), r_hat);
+      println!("\nv={},r.v={}", v_hat, dot(&v_hat, &r_hat));
+      
     }}
+
+    let rv = dot(&v_hat, &r_hat);
+
+    if rv > 0.0 {
+      let phong_scale = std::num::pow(rv, sphere.inner.phong_n as uint);
+      let phong_light = colour::colour_scale(&light.colour, phong_scale as f32);
+      let phong_part  = colour::colour_multiply(&phong_light, phong); // could also be extracted
+      result_colour = colour::colour_add(&result_colour, &phong_part);
+    }
   }
 
   // TODO soft shadows (light sampling) -  use random sampling
@@ -352,7 +369,7 @@ fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4) -> Colour {
   // TODO transparency
   // TODO inner/outer hits and materials
 
-  return result_colour;
+  return colour_clamp(&result_colour);
 }
 
 // scene space => 1 ray per pixel(vertex), right handed system, but with 0,0 in the centre

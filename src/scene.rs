@@ -2,7 +2,6 @@
 use std::fmt;
 
 use colour::Colour;
-use colour::clamp;
 use mat4;
 use vec4::Vec4;
 
