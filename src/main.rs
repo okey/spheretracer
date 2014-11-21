@@ -433,6 +433,8 @@ fn render_step(scene: &scene::Scene, colour_data: &mut [GLfloat], progress: uint
   let wx = scene.image_size.val0() as int;
   let wy = scene.image_size.val1() as int;
 
+  let viewpoint = point!(0.0 0.0 1.0);
+
   let row = progress as int / (COLOUR_WIDTH as int * wy);
   let col = (progress as int % (COLOUR_WIDTH as int * wy)) / COLOUR_WIDTH as int;
 
@@ -443,12 +445,17 @@ fn render_step(scene: &scene::Scene, colour_data: &mut [GLfloat], progress: uint
   // ray start
   let px = ((row - hx) as f64 + 0.5) / hy as f64;
   let py = ((col - hy) as f64 + 0.5) / hy as f64;
-  let u = point!(px py 1.0);
-
+  //let u = point!(px py 1.0);
+  let u = viewpoint;
+  
   // ray direction
   // this is always the same, could cache it
+  let step_x = 1.0 / hx as f64;
+  let step_y = 1.0 / hy as f64;
+  let dx = (row as f64 - hx as f64) * step_y;
+  let dy = (col as f64 - hy as f64) * step_y;
   let dz = -1.0; // cleaner than using 0.0-1.0 to get macro to work
-  let v = vector!(0.0 0.0 dz);
+  let v = vector!(dx dy dz);
   
   unsafe { debug = row == hx && col == hy; }
   let colour = trace_ray(scene, &u, &v, depth_max);
