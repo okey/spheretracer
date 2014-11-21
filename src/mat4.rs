@@ -1,7 +1,7 @@
 use std::num::FloatMath;
 use std::f64 as stdf64;
 
-use vec4::{Vec4,normalise};
+use vec4::{Vec4,Normalise};
 
 pub const DIM: uint = 4;
 
@@ -86,7 +86,7 @@ pub fn rotate(axis: &Vec4, rads: f64) -> Matrix {
 
   let sinr = FloatMath::sin(rads);
   let cosr = FloatMath::cos(rads);
-  let u = normalise(axis);
+  let u = axis.normalise();
 
   // TODO sq macro if there isn't already one
   let xx = u.x * u.x;

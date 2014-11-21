@@ -5,8 +5,7 @@ use std::path::Path;
 use std::fmt;
 
 use mat4;
-use vec4;
-use vec4::Vec4;
+use vec4::{AsDivisorOf,Vec4}; // TODO Clean trait usage up when UFCS is implemented in Rust
 use colour;
 use colour::Colour;
 use scene::{Scene,Light,Material,Sphere,make_colour,make_material};
@@ -238,7 +237,7 @@ pub fn read_scene(filename: &Path) -> ParseResult {
 
         if offsets.len() == 3 {
           let this_t = mat4::translate(&vector!(offsets));
-          let this_i = mat4::translate(&vec4::scale_by(&vector!(offsets), -1.0));
+          let this_i = mat4::translate(&(vector!(offsets) * -1.0));
 
           // premultiply T and postmultiply I
           sphere.transform = mat4::multiply(&this_t, &sphere.transform);
@@ -260,7 +259,7 @@ pub fn read_scene(filename: &Path) -> ParseResult {
 
         if offsets.len() == 3 {
           let this_t = mat4::scale(&vector!(offsets));
-          let this_i = mat4::scale(&vec4::as_divisor(1.0, &vector!(offsets)));
+          let this_i = mat4::scale(&vector!(offsets).as_divisor_of(1.0));
 
           // premultiply T and postmultiply I
           sphere.transform = mat4::multiply(&this_t, &sphere.transform);

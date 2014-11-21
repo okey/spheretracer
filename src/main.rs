@@ -2,6 +2,7 @@
 #![feature(macro_rules)]
 #![feature(phase)]
 #![feature(globs)]
+#![feature(if_let)]
 
 extern crate gl;
 extern crate glfw;
@@ -15,7 +16,8 @@ use glfw::Context;
 use sceneio::read_scene;
 // todo fix namespace
 use mat4::transpose;
-use vec4::{Vec4,dot,sub,normalise,parametric_position,transform_multiply,as_vector,scale_by,magnitude};
+use vec4::{Vec4,DotProduct,Normalise,Magnitude,Transform,AsVector,Apply};
+// TODO clean up trait usage once UFCS has been implemented in Rust
 use colour::{Colour};
 use scene::{Sphere,Material};
 
@@ -211,9 +213,9 @@ type HitSOpt<'a> = Option<HitS<'a>>;
 
 fn intersect_fixed_sphere(u: &Vec4, v: &Vec4, r: f64) -> TestOpt {
   // TODO perf these are the same for each object for a ray, so could manually cache them
-  let uu = dot(u, u);
-  let uv = dot(u, v);
-  let vv = dot(v, v);
+  let uu = u.dot(u);
+  let uv = u.dot(v);
+  let vv = v.dot(v);
   
   let a = vv;
   let b = 2.0 * uv;
@@ -238,8 +240,8 @@ fn intersect_fixed_sphere(u: &Vec4, v: &Vec4, r: f64) -> TestOpt {
 
 static mut debug: bool = false;
 fn intersect_sphere<'a>(sphere: &'a scene::Sphere,  u: &Vec4, v: &Vec4) -> HitSOpt<'a> {
-  let uprime = transform_multiply(&sphere.inverse_t, u);
-  let vprime = transform_multiply(&sphere.inverse_t, v);
+  let uprime = u.transform(&sphere.inverse_t);//transform_multiply(&sphere.inverse_t, u);
+  let vprime = v.transform(&sphere.inverse_t);//transform_multiply(&sphere.inverse_t, v);
 
   match intersect_fixed_sphere(&uprime, &vprime, sphere.radius) {
     Some(x) => {
@@ -253,7 +255,7 @@ fn intersect_sphere<'a>(sphere: &'a scene::Sphere,  u: &Vec4, v: &Vec4) -> HitSO
       else if t2 >= 0.0 { t2 }
       else { return None };
 
-      let h = parametric_position(&uprime, &vprime, t);
+      let h = vec4::parametric_position(&uprime, &vprime, t);
       
       Some((sphere, t, h))
     },
@@ -262,7 +264,7 @@ fn intersect_sphere<'a>(sphere: &'a scene::Sphere,  u: &Vec4, v: &Vec4) -> HitSO
 }
 
 
-const SOFT_SHADOW_SAMPLES: uint = 1;
+const SOFT_SHADOW_SAMPLES: uint = 20;
 const SOFT_SHADOW_COEFF: f64 = 0.05;
 
 fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4, depth: uint) -> Colour {
@@ -286,10 +288,9 @@ fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4, depth: uint) -> Colour {
   let sphere = &hit.val0();
   let t = hit.val1();
   
-  let hit_u = parametric_position(u, v, t * 0.9999);
-  let hit_v = normalise(&sub(u, &hit_u));
-  let n_hat = normalise(&transform_multiply(&transpose(&sphere.inverse_t), 
-                                            &as_vector(&hit.val2())));
+  let hit_u = vec4::parametric_position(u, v, t * 0.9999);
+  let hit_v = (*u - hit_u).normalise();
+  let n_hat = hit.val2().as_vector().transform(&mat4::transpose(&sphere.inverse_t)).normalise();
   let v_hat = hit_v;
 
   let diffuse = &sphere.inner.diffuse;
@@ -306,16 +307,16 @@ fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4, depth: uint) -> Colour {
   for light in scene.lights.iter() {
 
     // i_vec kept to take magnitude later TODO fixme
-    let i_vec = sub(&light.position, &hit_u);
+    let i_vec = light.position - hit_u;
     // i_hat is a unit vector in direction of light source
-    let i_hat = normalise(&i_vec);
+    let i_hat = i_vec.normalise();
     
     let mut visible_samples:uint = 0;
     
     // maybe a different distribution would look better?
     if SOFT_SHADOW_SAMPLES == 1 { // no sampling
       
-      let light_t = magnitude(&i_vec);
+      let light_t = i_vec.magnitude();
       
       // Would be quicker if we stopped on hit
       let hits = scene.spheres.iter()
@@ -329,42 +330,19 @@ fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4, depth: uint) -> Colour {
       
       for _ in range(0, SOFT_SHADOW_SAMPLES) { // random sampling
         // Jitter the light position by +/-0.5 * coeff in each axis to model lights with area
-        let jit_pos = Vec4 {
-          x: light.position.x + (rng() - 0.5) * SOFT_SHADOW_COEFF,
-          y: light.position.y + (rng() - 0.5) * SOFT_SHADOW_COEFF,
-          z: light.position.z + (rng() - 0.5) * SOFT_SHADOW_COEFF,
-          w: 0.0
-        };
+        let jit_i_vec = light.position.apply(|c| c + (rng() - 0.5) * SOFT_SHADOW_COEFF) - hit_u;
         
-        let jit_i_vec = sub(&jit_pos, &hit_u);
-        
-        // TODO is there a better functional equivalent?
-        let blocked= scene.spheres.iter()
-          .scan(false, |fail, s| {
-            if *fail { return None::<bool> }
-
-            match intersect_sphere(s, &hit_u, &jit_i_vec) {
-              Some(h) if h.val1() >= 0.0 && h.val1() <= 1.0 => { // not sure about this bounding...
-                *fail = true;
-                return Some(true)
-              },
-              _ => return None
-            }
-          }).collect::<Vec<bool>>().len() != 0;
-        //if let Some(_) = *self { true } else { false }
-
-        /*
-        // Iterative version:
+        // TODO correct light t bounding
+        // It's a shame that using scan to avoid mutable state makes this harder to read
         let mut blocked = false;
         for s in scene.spheres.iter() {
-          match intersect_sphere(s, &hit_u, &jit_i_vec) {
-            Some(h) if h.val1() >= 0.0 && h.val1() <= 1.0 => { 
+          if let Some(h) = intersect_sphere(s, &hit_u, &jit_i_vec) {
+            if h.val1() >= 0.0 {
               blocked = true;
               break;
-            },
-            _ => continue
+            }
           }
-        }*/
+        }
 
         if !blocked { visible_samples += 1; }
       }
@@ -377,7 +355,7 @@ fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4, depth: uint) -> Colour {
     // let kd = 1.0
     // therefore for each light add I[j]*n.i 
     
-    let ni = dot(&n_hat, &i_hat) * soften_scale;
+    let ni = n_hat.dot(&i_hat) * soften_scale;
     if ni > 0.0 { 
       let diff_light = colour::colour_scale(&light.colour, ni as f32);
       // could extract the following multiplication outside the loop if I slackened colour clamping
@@ -392,16 +370,18 @@ fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4, depth: uint) -> Colour {
     // TODO extract reflection outside of lights loop by changing which vector we reflect
     // r_hat is a unit vector of the light vector reflected about the normal
     // r_hat = i_hat - 2*(i_hat.n_hat)*n_hat
-    let n_perp2 = scale_by(&n_hat, 2.0 * dot(&i_hat, &n_hat)); // scale factor TODO rename
-    let r_hat = normalise(&sub(&n_perp2, &i_hat));
+    //let n_perp2 = scale_by(&n_hat, 2.0 * dot(&i_hat, &n_hat)); // scale factor TODO rename
+    let n_perp2 = n_hat * (2.0 * i_hat.dot(&n_hat));
+    //let r_hat = normalise(&sub(&n_perp2, &i_hat));
+    let r_hat = (n_perp2 - i_hat).normalise();
 
-    unsafe { if debug {
+    /*unsafe { if debug {
       println!("\nn={},n.i={},r={}", n_hat, dot(&i_hat, &n_hat), r_hat);
       println!("\nv={},r.v={}", v_hat, dot(&v_hat, &r_hat));
       
-    }}
+    }}*/
 
-    let rv = dot(&v_hat, &r_hat) * soften_scale;
+    let rv = v_hat.dot(&r_hat) * soften_scale;
 
     if rv > 0.0 {
       let phong_scale = std::num::pow(rv, sphere.inner.phong_n as uint);
@@ -413,7 +393,8 @@ fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4, depth: uint) -> Colour {
 
   if !colour::colour_eq(&colour::BLACK, &sphere.inner.mirror) {
     let reflected_u = hit_u;
-    let reflected_v = normalise(&sub(&scale_by(&n_hat, 2.0 * dot(&v_hat, &n_hat)), &v_hat));
+    //let reflected_v = normalise(&sub(&scale_by(&n_hat, 2.0 * dot(&v_hat, &n_hat)), &v_hat));
+    let reflected_v = (n_hat * (2.0 * v_hat.dot(&n_hat)) - v_hat).normalise();
     let reflected_c = trace_ray(scene, &reflected_u, &reflected_v, depth - 1);
 
     let mirror_part = colour::colour_multiply(&sphere.inner.mirror, &reflected_c);
