@@ -29,8 +29,8 @@ mod sceneio;
 mod shaders;
 
 
-static COLOUR_WIDTH:uint = 4;
-static VERTEX_WIDTH:uint = 2;
+const COLOUR_WIDTH:uint = 4;
+const VERTEX_WIDTH:uint = 2;
 
 fn make_gl_proj_mat(width: uint, height: uint) -> [GLfloat, ..16] {
   let mut m:[GLfloat, ..16] = [0.0, ..16];
@@ -327,7 +327,7 @@ fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4, depth: uint) -> Colour {
       visible_samples = SOFT_SHADOW_SAMPLES; // so that the softening factor is 1
     } else {
       
-      for sample in range(0, SOFT_SHADOW_SAMPLES) { // random sampling
+      for _ in range(0, SOFT_SHADOW_SAMPLES) { // random sampling
         // Jitter the light position by +/-0.5 * coeff in each axis to model lights with area
         let jit_pos = Vec4 {
           x: light.position.x + (rng() - 0.5) * SOFT_SHADOW_COEFF,
@@ -351,6 +351,7 @@ fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4, depth: uint) -> Colour {
               _ => return None
             }
           }).collect::<Vec<bool>>().len() != 0;
+        //if let Some(_) = *self { true } else { false }
 
         /*
         // Iterative version:
@@ -433,39 +434,41 @@ fn render_step(scene: &scene::Scene, colour_data: &mut [GLfloat], progress: uint
   let wx = scene.image_size.val0() as int;
   let wy = scene.image_size.val1() as int;
 
-  let viewpoint = point!(0.0 0.0 1.0);
-
   let row = progress as int / (COLOUR_WIDTH as int * wy);
   let col = (progress as int % (COLOUR_WIDTH as int * wy)) / COLOUR_WIDTH as int;
 
   let hx = wx / 2;
   let hy = wy / 2;
 
-  // Let our screen in object space be -1*wx/wy,-1,1 to 1*wx/wy,1,1
   // ray start
-  let px = ((row - hx) as f64 + 0.5) / hy as f64;
-  let py = ((col - hy) as f64 + 0.5) / hy as f64;
-  //let u = point!(px py 1.0);
-  let u = viewpoint;
+  // this is our viewpoint
+  let u = point!(0.0 0.0 1.0);
+  
+  
+  // use find the amount the direction changes per pixel
+  // use the y-axis to fix the FOV so that 800x600 looks like 600x600 but showing more of the scene
+  // instead of stretching the contents
+  // Let our screen in object space be -1*wx/wy,-1,1 to 1*wx/wy,1,1
+  // TODO this is always the same, could cache it
+  let step_y = 1.0 / hy as f64;
+  let step_half = step_y / 2.0;
   
   // ray direction
-  // this is always the same, could cache it
-  let step_x = 1.0 / hx as f64;
-  let step_y = 1.0 / hy as f64;
-  let dx = (row as f64 - hx as f64) * step_y;
-  let dy = (col as f64 - hy as f64) * step_y;
+  // we add half the step so that the ray is in the centre of the sample rectangle
+  let dx = (row as f64 - hx as f64) * step_y + step_half;
+  let dy = (col as f64 - hy as f64) * step_y + step_half;
   let dz = -1.0; // cleaner than using 0.0-1.0 to get macro to work
   let v = vector!(dx dy dz);
   
-  unsafe { debug = row == hx && col == hy; }
+  unsafe { debug = row == hx && col == hy; } // track the centre ray for debugging
   let colour = trace_ray(scene, &u, &v, depth_max);
-  // TODO freeze scene after IO??
+
+  // TODO check scene is correctly frozen after IO
   colour_data[progress] = colour.red;
   colour_data[progress + 1] = colour.green;
   colour_data[progress + 2] = colour.blue;
 
   // TODO antialiasing
-
   progress + 4
 }
 
