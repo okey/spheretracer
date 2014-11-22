@@ -6,8 +6,9 @@ use vec4::{Vec4,Normalise};
 pub const DIM: uint = 4;
 
 pub type Matrix = [[f64, ..DIM], ..DIM];
-// if I want to add traits for this I need to use a newtype... and then manually add all the inner type traits
-//... blergh
+// if I want to add traits for this I need to use a newtype...
+// and then manually add all the inner type traits...
+// blergh
 
 pub fn identity() -> Matrix {
   [[1.0, 0.0, 0.0, 0.0],

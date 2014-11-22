@@ -238,7 +238,6 @@ fn intersect_fixed_sphere(u: &Vec4, v: &Vec4, r: f64) -> TestOpt {
   Some((t1, t2))
 }
 
-static mut debug: bool = false;
 fn intersect_sphere<'a>(sphere: &'a scene::Sphere,  u: &Vec4, v: &Vec4) -> HitSOpt<'a> {
   let uprime = u.transform(&sphere.inverse_t);//transform_multiply(&sphere.inverse_t, u);
   let vprime = v.transform(&sphere.inverse_t);//transform_multiply(&sphere.inverse_t, v);
@@ -421,7 +420,6 @@ fn render_step(scene: &scene::Scene, colour_data: &mut [GLfloat], progress: uint
   let dz = -1.0; // cleaner than using 0.0-1.0 to get macro to work
   let v = vector!(dx dy dz);
   
-  unsafe { debug = row == hx && col == hy; } // track the centre ray for debugging
   let colour = trace_ray(scene, &u, &v, depth_max);
 
   // TODO check scene is correctly frozen after IO

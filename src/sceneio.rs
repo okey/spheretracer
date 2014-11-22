@@ -59,13 +59,14 @@ macro_rules! radians(
   ($degrees:expr) => {$degrees as f64 * f64consts::PI / 180.0};)
 
 
-// Just using TOML and converting any old scenes with python would have been cleaner and easier, but I'm trying to learn Rust
+// Just using TOML and converting any old scenes with python would have been cleaner and easier,
+// but I'm trying to learn Rust
 pub fn read_scene(filename: &Path) -> ParseResult {
   let mut file = BufferedReader::new(File::open(filename));
   let mut line_num = 0u;
 
   // Default scene
-  // TODO use defaults properly
+  // TODO meaningful defaults
   let mut scene = Scene {
     image_size: (1, 2),
     ambient: colour::WHITE,
@@ -76,7 +77,8 @@ pub fn read_scene(filename: &Path) -> ParseResult {
 
   // Used to reject attempts to set object properties from outside an object
   let mut in_object = false;
-  // maybe there's an equivalent of .next() that would let me avoid this and use an inner consuming loop?
+  // maybe there's an equivalent of .next() that would let me avoid this and
+  // use an inner consuming loop instead?
   // try advance()?
 
   for line in file.lines() {
@@ -157,7 +159,7 @@ pub fn read_scene(filename: &Path) -> ParseResult {
         }
       },
 
-      // TODO bar, cylinder, also tri?
+      // TODO other shapes: bar, cylinder, triangle
       "sphere" => {
         in_object = true;
         let vals: Vec<f64> = tokens.tail().iter().filter_map(|&s| from_str::<f64>(s)).collect();
@@ -177,7 +179,7 @@ pub fn read_scene(filename: &Path) -> ParseResult {
         }
       },
 
-      // TODO shouldn't really allow materials to be omitted
+      // TODO shouldn't really allow materials to be omitted, nor duplicate properties
       // Object properties
       "inner"     if in_object && n == 11 => {
         // slice_or_fail(&1u, &10u) is pretty ugly but more stable?
@@ -239,7 +241,7 @@ pub fn read_scene(filename: &Path) -> ParseResult {
           let this_t = mat4::translate(&vector!(offsets));
           let this_i = mat4::translate(&(vector!(offsets) * -1.0));
 
-          // premultiply T and postmultiply I
+          // premultiply T and postmultiply Inv
           sphere.transform = mat4::multiply(&this_t, &sphere.transform);
           sphere.inverse_t = mat4::multiply(&sphere.inverse_t, &this_i);
         } else {
@@ -261,7 +263,7 @@ pub fn read_scene(filename: &Path) -> ParseResult {
           let this_t = mat4::scale(&vector!(offsets));
           let this_i = mat4::scale(&vector!(offsets).as_divisor_of(1.0));
 
-          // premultiply T and postmultiply I
+          // premultiply T and postmultiply Inv
           sphere.transform = mat4::multiply(&this_t, &sphere.transform);
           sphere.inverse_t = mat4::multiply(&sphere.inverse_t, &this_i);
         } else {
@@ -270,8 +272,6 @@ pub fn read_scene(filename: &Path) -> ParseResult {
         }
       },
 
-      // TODO wouldn't another repr e.g. general axis angle vector be much less annoying?
-      // even if the formula for the matrix is a little more involved, it's not that bad...
       "rotate"    if in_object && n == 3  => {
         let sphere = match scene.spheres.last_mut() {
           Some(val) => val,
@@ -297,7 +297,7 @@ pub fn read_scene(filename: &Path) -> ParseResult {
         let this_i = mat4::rotate(&axis, -1.0 * angle_r);
 
 
-        // premultiply T and postmultiply I
+        // premultiply T and postmultiply Inv
         sphere.transform = mat4::multiply(&this_t, &sphere.transform);
         sphere.inverse_t = mat4::multiply(&sphere.inverse_t, &this_i);
       },
