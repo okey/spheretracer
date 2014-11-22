@@ -164,12 +164,12 @@ fn gl_init_and_render(scene: &scene::Scene) {
   }
 
   let mut progress = 0;
-  println!("starting loop");
+  //println!("starting loop");
   //while progress < colour_data.len() {
   //  progress = render_step(scene, colour_data, progress);
   //}
-  println!("done");
-  let mut chunk = 0;
+  //println!("done");
+  let mut chunk = 0; // Render performance compromise: chunks
   let chunk_size = wy * 4;
   let max_chunk = colour_data.len() / chunk_size;
   
@@ -390,7 +390,13 @@ fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4, depth: uint) -> Colour {
 // so need to translate by w/2 and h/2, don't flip Z because we should already be in an RH system
 // and scale back to 2x2 plane
 fn render_step(scene: &scene::Scene, colour_data: &mut [GLfloat], progress: uint) -> uint {
-  let depth_max = 5;
+  const SSAA_SAMPLES: uint = 3;
+  assert!(SSAA_SAMPLES > 0 && SSAA_SAMPLES % 2 == 1); // must be a +ve odd integer
+  const SSAA_SAMPLES_SQ: f32 = SSAA_SAMPLES as f32 * SSAA_SAMPLES as f32;
+  
+  const DEPTH_MAX: uint = 5;
+  assert!(DEPTH_MAX > 0); // 0 would produce an entirely black image
+
   let wx = scene.image_size.val0() as int;
   let wy = scene.image_size.val1() as int;
 
@@ -412,15 +418,29 @@ fn render_step(scene: &scene::Scene, colour_data: &mut [GLfloat], progress: uint
   // TODO this is always the same, could cache it
   let step_y = 1.0 / hy as f64;
   let step_half = step_y / 2.0;
+  let sample_step = step_y / (SSAA_SAMPLES + 1) as f64;
+  
   
   // ray direction
   // we add half the step so that the ray is in the centre of the sample rectangle
-  let dx = (row as f64 - hx as f64) * step_y + step_half;
-  let dy = (col as f64 - hy as f64) * step_y + step_half;
-  let dz = -1.0; // cleaner than using 0.0-1.0 to get macro to work
-  let v = vector!(dx dy dz);
+  // unless we are supersampling, in which case we want to sample a centred grid
+  // starting from the bottom left
+  let dx = (row as f64 - hx as f64) * step_y + 
+    if SSAA_SAMPLES == 1 { step_half } else { sample_step };
+  let dy = (col as f64 - hy as f64) * step_y +
+    if SSAA_SAMPLES == 1 { step_half } else { sample_step };
+  let dz = -1.0;
   
-  let colour = trace_ray(scene, &u, &v, depth_max);
+  // Uniform grid supersampling because I don't like random supersampling
+  // TODO Try Poisson disc sampling
+  let mut colour = colour::BLACK;
+  for x in range(0, SSAA_SAMPLES) {
+    for y in range(0, SSAA_SAMPLES) {
+      let v = vector!(dx + (x as f64 * sample_step) dy + (y as f64 * sample_step) dz);
+      colour = colour::colour_add(&colour, &trace_ray(scene, &u, &v, DEPTH_MAX));
+    }
+  }
+  colour = colour::colour_scale(&colour, 1.0 / SSAA_SAMPLES_SQ);
 
   // TODO check scene is correctly frozen after IO
   colour_data[progress] = colour.red;
