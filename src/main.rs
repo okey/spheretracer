@@ -16,7 +16,7 @@ use glfw::Context;
 use sceneio::read_scene;
 // todo fix namespace
 use mat4::transpose;
-use vec4::{Vec4,DotProduct,Normalise,Magnitude,Transform,AsVector,Apply};
+use vec4::{Vec4,DotProduct,Normalise,Transform,AsVector,Apply};
 // TODO clean up trait usage once UFCS has been implemented in Rust
 use colour::{Colour};
 use scene::{Sphere,Material};
@@ -263,9 +263,83 @@ fn intersect_sphere<'a>(sphere: &'a scene::Sphere,  u: &Vec4, v: &Vec4) -> HitSO
   }
 }
 
+fn soft_shadow_scale(scene: &scene::Scene, light: &scene::Light, hit_u: &Vec4) -> f64 {
+  const SOFT_SHADOW_SAMPLES: uint = 20;
+  const SOFT_SHADOW_COEFF: f64 = 0.05;
+  
+  // TODO cache and pass ref to this
+  let rng = rand::random::<f64>;
 
-const SOFT_SHADOW_SAMPLES: uint = 20;
-const SOFT_SHADOW_COEFF: f64 = 0.05;
+  // Jitter the light position by +/-0.5 * coeff in each axis to model lights with area
+  let light_i_fn = if SOFT_SHADOW_SAMPLES == 1 {
+    |p: &Vec4| *p - *hit_u // No jitter if we are only taking one sample (i.e. no soft shadows)
+  } else {
+    |p: &Vec4| p.apply(|c: f64| c + (rng() - 0.5) * SOFT_SHADOW_COEFF) - *hit_u
+  };
+  
+  // Random sampling. Maybe a different distribution would look better?      
+  let visible_samples = range(0, SOFT_SHADOW_SAMPLES).filter_map(|_| {
+    let jit_i_vec = light_i_fn(&light.position);
+    
+    // If this sample is in shadow then do not count it
+    let blocked = scene.spheres.iter().any(|s| {
+      if let Some(h) = intersect_sphere(s, hit_u, &jit_i_vec) {
+        return h.val1() >= 0.0 && h.val1() <= 1.0
+      };
+      false
+    });
+    
+    if !blocked { return Some::<uint>(1) }
+    None
+  }).count();
+  
+  visible_samples as f64 / SOFT_SHADOW_SAMPLES as f64
+}
+
+// Phong illumination model
+// hit_u is the hitpoint
+// n_hat is the surface normal at the hitpoint
+// v_hat is the vector from the hitpoint back to the viewpoint
+fn illuminate_hit(scene: &scene::Scene, material: &scene::Material,
+                  hit_u: &Vec4, n_hat: &Vec4, v_hat: &Vec4) -> Colour {
+  // Ambient lighting
+  // TODO no ambient component inside of a sphere unless it is transparent
+  let mut result_colour = colour::colour_multiply(&material.diffuse, &scene.ambient);
+
+  for light in scene.lights.iter() {
+    // i_hat is a unit vector in direction of light source
+    let i_hat = (light.position - *hit_u).normalise();
+    
+    let soften_scale = soft_shadow_scale(scene, light, hit_u); 
+    if soften_scale == 0.0 { continue; } // in shadow
+
+    // Diffuse (Lambertian) component
+    let ni = n_hat.dot(&i_hat) * soften_scale;
+    if ni > 0.0 { 
+      let diff_light = colour::colour_scale(&light.colour, ni as f32);
+      // could extract the following multiplication outside the loop 
+      let diff_part = colour::colour_multiply(&diff_light, &material.diffuse);
+      result_colour = colour::colour_add(&result_colour, &diff_part);
+    }
+
+    // Phong highlight component
+    // r_hat is a unit vector of the light vector reflected about the normal
+    let n_perp2 = *n_hat * (2.0 * i_hat.dot(n_hat));
+    let r_hat = (n_perp2 - i_hat).normalise();
+    // TODO extract vector reflection outside of lights loop by changing which vector we reflect
+
+    let rv = v_hat.dot(&r_hat) * soften_scale;
+    if rv > 0.0 {
+      let phong_scale = std::num::pow(rv, material.phong_n as uint);
+      let phong_light = colour::colour_scale(&light.colour, phong_scale as f32);
+       // could also be extracted
+      let phong_part  = colour::colour_multiply(&phong_light, &material.phong);
+      result_colour = colour::colour_add(&result_colour, &phong_part);
+    }
+  }
+
+  result_colour
+}
 
 fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4, depth: uint) -> Colour {
   // Stop mirror ray recursion
@@ -273,136 +347,42 @@ fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4, depth: uint) -> Colour {
 
   // Find all objects that lie in the path of the ray for non -ve t
   let hits = scene.spheres.iter()
-    .filter_map(|s| intersect_sphere(s, u, v)) // if we intersect
+    .filter_map(|s| intersect_sphere(s, u, v))
     .collect::<Vec<HitS>>();
   
   // Could multiply this with the ambient if desired
   if hits.len() == 0 { return scene.background; }
   
   
-  // Take the closest hit and extract
+  // Take the closest hit and extract the result
   let fake_s = sphere!();
   let fake_h = (&fake_s, std::f64::MAX_VALUE, vector!(), false);
   let hit = hits.iter().fold(fake_h, |s, h| { if h.val1() < s.val1() { *h } else { s }});
 
   let sphere = &hit.val0();
-  let t = hit.val1();
   let material = if hit.val3() { sphere.outer } else { sphere.inner };
   
-  let hit_u = vec4::parametric_position(u, v, t * 0.9999);
-  let hit_v = (*u - hit_u).normalise();
+  // Find the hit position, surface normal at the hit position, and reverse viewpoint vectors
+  let hit_u = vec4::parametric_position(u, v, hit.val1() * 0.9999);
   let n_hat = hit.val2().as_vector().transform(&mat4::transpose(&sphere.inverse_t)).normalise();
-  let v_hat = hit_v;
+  let v_hat = (*u - hit_u).normalise();
 
-  let diffuse = &material.diffuse;
-  let phong = &material.phong;
-  // let ka = 1.0 therefore we do not scale the ambience further
-  // scale colour by the intensity and colour of ambience
-  let mut result_colour = colour::colour_multiply(diffuse, &scene.ambient);
+  // Do illumination using the Phong model
+  let phong_colour = illuminate_hit(scene, &material, &hit_u, &n_hat, &v_hat);
   
-  
-  // TODO cache and pass ref to this
-  let rng = rand::random::<f64>;
-  
-  // TODO break out functions for diffuse and phong
-  for light in scene.lights.iter() {
-
-    // i_vec kept to take magnitude later TODO fixme
-    let i_vec = light.position - hit_u;
-    // i_hat is a unit vector in direction of light source
-    let i_hat = i_vec.normalise();
-    
-    let mut visible_samples:uint = 0;
-    
-    // maybe a different distribution would look better?
-    if SOFT_SHADOW_SAMPLES == 1 { // no sampling
-      
-      let light_t = i_vec.magnitude();
-      
-      // Would be quicker if we stopped on hit
-      let hits = scene.spheres.iter()
-        .filter_map(|s| intersect_sphere(s, &hit_u, &i_hat))
-        .filter(|h| h.val1() < light_t) // intersections beyond the light don't block it
-        .collect::<Vec<HitS>>();
-
-      if hits.len() > 0 { continue; } // in shadow
-      visible_samples = SOFT_SHADOW_SAMPLES; // so that the softening factor is 1
-    } else {
-      
-      for _ in range(0, SOFT_SHADOW_SAMPLES) { // random sampling
-        // Jitter the light position by +/-0.5 * coeff in each axis to model lights with area
-        let jit_i_vec = light.position.apply(|c| c + (rng() - 0.5) * SOFT_SHADOW_COEFF) - hit_u;
-        
-        // It's a shame that using scan to avoid mutable state makes this harder to read
-        let mut blocked = false;
-        for s in scene.spheres.iter() {
-          if let Some(h) = intersect_sphere(s, &hit_u, &jit_i_vec) {
-            if h.val1() >= 0.0 && h.val1() < 1.0 { // 1.0 because jit_i_vec is not normalised
-              blocked = true;
-              break;
-            }
-          }
-        }
-
-        if !blocked { visible_samples += 1; }
-      }
-    }
-    if visible_samples == 0 { continue; } // in shadow
-
-    let soften_scale = visible_samples as f64 / SOFT_SHADOW_SAMPLES as f64;
-
-    // Diffuse component
-    // let kd = 1.0
-    // therefore for each light add I[j]*n.i 
-    
-    let ni = n_hat.dot(&i_hat) * soften_scale;
-    if ni > 0.0 { 
-      let diff_light = colour::colour_scale(&light.colour, ni as f32);
-      // could extract the following multiplication outside the loop if I slackened colour clamping
-      let diff_part = colour::colour_multiply(&diff_light, diffuse);
-      result_colour = colour::colour_add(&result_colour, &diff_part);
-    }
-
-    // Phong component
-    // let kp = 1.0
-    // therefore for each light add I[j]*(v.r)**n
-  
-    // TODO extract reflection outside of lights loop by changing which vector we reflect
-    // r_hat is a unit vector of the light vector reflected about the normal
-    // r_hat = i_hat - 2*(i_hat.n_hat)*n_hat
-    //let n_perp2 = scale_by(&n_hat, 2.0 * dot(&i_hat, &n_hat)); // scale factor TODO rename
-    let n_perp2 = n_hat * (2.0 * i_hat.dot(&n_hat));
-    //let r_hat = normalise(&sub(&n_perp2, &i_hat));
-    let r_hat = (n_perp2 - i_hat).normalise();
-
-    /*unsafe { if debug {
-      println!("\nn={},n.i={},r={}", n_hat, dot(&i_hat, &n_hat), r_hat);
-      println!("\nv={},r.v={}", v_hat, dot(&v_hat, &r_hat));
-      
-    }}*/
-
-    let rv = v_hat.dot(&r_hat) * soften_scale;
-
-    if rv > 0.0 {
-      let phong_scale = std::num::pow(rv, material.phong_n as uint);
-      let phong_light = colour::colour_scale(&light.colour, phong_scale as f32);
-      let phong_part  = colour::colour_multiply(&phong_light, phong); // could also be extracted
-      result_colour = colour::colour_add(&result_colour, &phong_part);
-    }
-  }
-
-  if !colour::colour_eq(&colour::BLACK, &material.mirror) {
-    let reflected_u = hit_u;
-    //let reflected_v = normalise(&sub(&scale_by(&n_hat, 2.0 * dot(&v_hat, &n_hat)), &v_hat));
+  // Trace any reflections
+  let mirror_colour = if !colour::colour_eq(&colour::BLACK, &material.mirror) {
     let reflected_v = (n_hat * (2.0 * v_hat.dot(&n_hat)) - v_hat).normalise();
-    let reflected_c = trace_ray(scene, &reflected_u, &reflected_v, depth - 1);
+    let reflected_c = trace_ray(scene, &hit_u, &reflected_v, depth - 1);
 
-    let mirror_part = colour::colour_multiply(&material.mirror, &reflected_c);
-    result_colour = colour::colour_add(&result_colour, &mirror_part);
-  }
+    colour::colour_multiply(&material.mirror, &reflected_c)
+  } else {
+    colour::BLACK
+  };
+  let result_colour = colour::colour_add(&phong_colour, &mirror_colour);
+
 
   // TODO transparency
-  // TODO inner/outer hits and materials
 
   return colour::colour_clamp(&result_colour);
 }
