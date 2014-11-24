@@ -14,7 +14,6 @@ use gl::types::*;
 use glfw::Context;
 
 use sceneio::read_scene;
-// todo fix namespace
 use mat4::transpose;
 use vec3::{Vec3,DotProduct,Normalise,Transform,AsVector,Apply};
 // TODO clean up trait usage once UFCS has been implemented in Rust
@@ -30,10 +29,12 @@ mod sceneio;
 
 mod shaders;
 
-
+/* The number of components expected per value (colour or position) in the data arrays drawn */
 const COLOUR_WIDTH:uint = 4;
 const VERTEX_WIDTH:uint = 2;
 
+
+/* Make an orthographic matrix to transform from NDC to world (scene) space */
 fn make_gl_ortho_mat(width: uint, height: uint) -> [GLfloat, ..16] {
   let mut m:[GLfloat, ..16] = [0.0, ..16];
   let w = width as f32;
@@ -41,17 +42,18 @@ fn make_gl_ortho_mat(width: uint, height: uint) -> [GLfloat, ..16] {
   let f = 0.1;
   let n = 0.0;
 
-  // from NDC to world space
+  // from NDC to world space:
   // translate by -1,-1 to put origin in bottom left
   // scale to change square 2,2 to rectangle w,h
   // flip Z because NDC is left handed
+  // set the near and far planes to draw z=[0.0,0.1)
 
   // OpenGL matrix memory layout has transposition vector as the last row like D3D
-  m[0] = 2.0 / w; // 2/(r-l)
-  m[12] = -1.0;   // direct construction, so -1.0 rather than -(r+l)/(r-l)
+  m[0] = 2.0 / w;
+  m[12] = -1.0;
   
-  m[5] = 2.0 / h; // 2/(t-b)
-  m[13] = -1.0;   // direct construction, so -1.0 rather than -(t+b)/(t-l)
+  m[5] = 2.0 / h;
+  m[13] = -1.0;
 
   m[10] = -2.0 / (f - n);
   m[14] = -1.0 * (f + n) / (f - n);
@@ -163,6 +165,7 @@ fn gl_init_and_render(scene: &scene::Scene) {
                             gl::FALSE as GLboolean, 0, ptr::null());
   }
 
+  // Do the raytracing in chunks so we can watch it happen on screen
   let mut chunk = 0;
   let chunk_size = wy * 4;
   let max_chunk = colour_data.len() / chunk_size;
@@ -177,7 +180,8 @@ fn gl_init_and_render(scene: &scene::Scene) {
       render_progress = render_step(scene, colour_data, render_progress);
     }
     chunk += 1;
-
+    
+    // cbo is still bound from setup
     unsafe { 
       gl::BufferData(gl::ARRAY_BUFFER,
                      (colour_data.len() * mem::size_of::<GLfloat>()) as GLsizeiptr, 
@@ -256,8 +260,9 @@ fn intersect_sphere<'a>(sphere: &'a scene::Sphere,  u: &Vec3, v: &Vec3) -> HitSO
   }
 }
 
+/* Calculate what factor to colour a position by, using rnadom smapling to soften shadows */
 fn soft_shadow_scale(scene: &scene::Scene, light: &scene::Light, hit_u: &Vec3) -> f64 {
-  const SOFT_SHADOW_SAMPLES: uint = 20;
+  const SOFT_SHADOW_SAMPLES: uint = 1;
   const SOFT_SHADOW_COEFF: f64 = 0.05;
   
   let rng = rand::random::<f64>; // TODO investigate performance of doing this here
@@ -285,18 +290,21 @@ fn soft_shadow_scale(scene: &scene::Scene, light: &scene::Light, hit_u: &Vec3) -
     None
   }).count();
   
+  // Return the proprotion by which we should colour the hit position
   visible_samples as f64 / SOFT_SHADOW_SAMPLES as f64
 }
 
-// Phong illumination model
-// hit_u is the hitpoint
-// n_hat is the surface normal at the hitpoint
-// v_hat is the vector from the hitpoint back to the viewpoint
+/* Illuminate a hit using the Phong illumination model
+ *
+ * hit_u is the hit position
+ * n_hat is the (unit) surface normal at the hit position
+ * v_hat is the (unit) vector from the hit position back to the viewpoint
+ */
 fn illuminate_hit(scene: &scene::Scene, material: &scene::Material,
                   hit_u: &Vec3, n_hat: &Vec3, v_hat: &Vec3) -> Colour {
   // Ambient lighting
   // TODO no ambient component inside of a sphere unless it is transparent
-  let mut result_colour = colour::colour_multiply(&material.diffuse, &scene.ambient);
+  let mut result_colour: colour::Colour = material.diffuse * scene.ambient;
 
   // TODO extract vector reflection outside of lights loop by changing which vector gets reflected
   for light in scene.lights.iter() {
@@ -309,23 +317,23 @@ fn illuminate_hit(scene: &scene::Scene, material: &scene::Material,
     // Diffuse (Lambertian) component
     let ni = n_hat.dot(&i_hat) * soften_scale;
     if ni > 0.0 { 
-      let diff_light = colour::colour_scale(&light.colour, ni as f32);
-      let diff_part = colour::colour_multiply(&diff_light, &material.diffuse);
-      result_colour = colour::colour_add(&result_colour, &diff_part);
+      let diff_light = light.colour * ni as f32;
+      let diff_part = diff_light * material.diffuse;
+      result_colour = result_colour + diff_part;
     }
 
     // Phong highlight component
     // r_hat is a unit vector of the light vector reflected about the normal
-    let n_perp2 = *n_hat * (2.0 * i_hat.dot(n_hat));
-    let r_hat = (n_perp2 - i_hat).normalise();
+    let n_p_scale = *n_hat * (2.0 * i_hat.dot(n_hat));
+    let r_hat = (n_p_scale - i_hat).normalise();
 
     let rv = v_hat.dot(&r_hat) * soften_scale;
     if rv > 0.0 {
       let phong_scale = std::num::pow(rv, material.phong_n as uint);
-      let phong_light = colour::colour_scale(&light.colour, phong_scale as f32);
+      let phong_light = light.colour * phong_scale as f32;
        // could also be extracted
-      let phong_part  = colour::colour_multiply(&phong_light, &material.phong);
-      result_colour = colour::colour_add(&result_colour, &phong_part);
+      let phong_part  = phong_light * material.phong;
+      result_colour = result_colour + phong_part;
     }
   }
 
@@ -361,15 +369,15 @@ fn trace_ray(scene: &scene::Scene, u: &Vec3, v: &Vec3, depth: uint) -> Colour {
   let phong_colour = illuminate_hit(scene, &material, &hit_u, &n_hat, &v_hat);
   
   // Trace any reflections
-  let mirror_colour = if !colour::colour_eq(&colour::BLACK, &material.mirror) {
+  let mirror_colour = if colour::BLACK != material.mirror {
     let reflected_v = (n_hat * (2.0 * v_hat.dot(&n_hat)) - v_hat).normalise();
     let reflected_c = trace_ray(scene, &hit_u, &reflected_v, depth - 1);
 
-    colour::colour_multiply(&material.mirror, &reflected_c)
+    material.mirror * reflected_c
   } else {
     colour::BLACK
   };
-  let result_colour = colour::colour_add(&phong_colour, &mirror_colour);
+  let result_colour = phong_colour + mirror_colour;
 
 
   // TODO transparency
@@ -377,11 +385,17 @@ fn trace_ray(scene: &scene::Scene, u: &Vec3, v: &Vec3, depth: uint) -> Colour {
   return colour::colour_clamp(&result_colour);
 }
 
-// scene space => 1 ray per pixel(vertex), right handed system, but with 0,0 in the centre
-// so need to translate by w/2 and h/2, don't flip Z because we should already be in an RH system
-// and scale back to 2x2 plane
+/* Trace a position on screen given our progress so far, then update the colour array */
 fn render_step(scene: &scene::Scene, colour_data: &mut [GLfloat], progress: uint) -> uint {
-  const SSAA_SAMPLES: uint = 3;
+  // Some values from this function could be hoisted but the gains from doing so are probably
+  // trivial compared to the cost of tracing
+
+  // We fire 1 ray per pixel
+  // Scene space is a right handed system, but with 0,0 in the centre so need to 
+  // translate by w/2 and h/2 and then scale back to plane of -1,-1 to 1,1 
+  // to transform from my screen space (RH system, origin in bottom left, w * h size
+
+  const SSAA_SAMPLES: uint = 1;
   assert!(SSAA_SAMPLES > 0 && SSAA_SAMPLES % 2 == 1); // must be a +ve odd integer
   const SSAA_SAMPLES_SQ: f32 = SSAA_SAMPLES as f32 * SSAA_SAMPLES as f32;
   
@@ -397,16 +411,14 @@ fn render_step(scene: &scene::Scene, colour_data: &mut [GLfloat], progress: uint
   let hx = wx / 2;
   let hy = wy / 2;
 
-  // ray start
-  // this is our viewpoint
+  // ray start - this is our viewpoint
   let u = point!(0.0 0.0 1.0);
   
   
-  // use find the amount the direction changes per pixel
+  // find the amount the direction changes per pixel
   // use the y-axis to fix the FOV so that 800x600 looks like 600x600 but showing more of the scene
   // instead of stretching the contents
-  // Let our screen in object space be -1*wx/wy,-1,1 to 1*wx/wy,1,1
-  // TODO this is always the same, could cache it
+  // let our viewplane in scene space be -1*wx/wy,-1,1 to 1*wx/wy,1,1
   let step_y = 1.0 / hy as f64;
   let step_half = step_y / 2.0;
   let sample_step = step_y / (SSAA_SAMPLES + 1) as f64;
@@ -428,17 +440,16 @@ fn render_step(scene: &scene::Scene, colour_data: &mut [GLfloat], progress: uint
   for x in range(0, SSAA_SAMPLES) {
     for y in range(0, SSAA_SAMPLES) {
       let v = vector!(dx + (x as f64 * sample_step) dy + (y as f64 * sample_step) dz);
-      colour = colour::colour_add(&colour, &trace_ray(scene, &u, &v, DEPTH_MAX));
+      colour = colour + trace_ray(scene, &u, &v, DEPTH_MAX);
     }
   }
-  colour = colour::colour_scale(&colour, 1.0 / SSAA_SAMPLES_SQ);
+  colour = colour * (1.0 / SSAA_SAMPLES_SQ);
 
-  // TODO check scene is correctly frozen after IO
+  // Update the colour array with the result
   colour_data[progress] = colour.red;
   colour_data[progress + 1] = colour.green;
   colour_data[progress + 2] = colour.blue;
 
-  // TODO antialiasing
   progress + 4
 }
 

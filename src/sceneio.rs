@@ -10,9 +10,13 @@ use colour;
 use colour::Colour;
 use scene::{Scene,Light,Material,Sphere,make_colour,make_material};
 
-/// markdown
-// comment
+/* Read a custom scene definition format and produce a scene structure for rendering
+ * The format is a bit of a kludge and this was implemented for the purpose of learning Rust.
+ *
+ * TODO rewrite or replace with TOML
+ */
 
+/* Types */
 #[deriving(Show)]
 enum ParseErrorKind {
   FileOperationFailed,
@@ -34,6 +38,9 @@ pub struct ParseError {
   pub line: ULineNumber,
 }
 
+type ParseResult = Result<Scene, ParseError>;
+
+/* Standard trait implemenations */
 impl FromError<IoError> for ParseError {
   fn from_error(e: IoError) -> ParseError {
     match e {
@@ -51,15 +58,16 @@ impl fmt::Show for ParseError {
   }
 }
 
-type ParseResult = Result<Scene, ParseError>;
-
-
+/* Macros */
 macro_rules! radians(
   ($degrees:expr) => {$degrees as f64 * f64consts::PI / 180.0};)
 
 
-// Just using TOML and converting any old scenes with python would have been cleaner and easier,
-// but I'm trying to learn Rust
+/* Public functions */
+
+/* Read a scene file or return a ParseError
+ * Warning: monolithic
+ */
 pub fn read_scene(filename: &Path) -> ParseResult {
   let mut file = BufferedReader::new(File::open(filename));
   let mut line_num = 0u;
@@ -76,16 +84,12 @@ pub fn read_scene(filename: &Path) -> ParseResult {
 
   // Used to reject attempts to set object properties from outside an object
   let mut in_object = false;
-  // maybe there's an equivalent of .next() that would let me avoid this and
-  // use an inner consuming loop instead?
-  // try advance()?
 
   for line in file.lines() {
     let ls = try!(line);
 
-    // Can we do this more cleanly and without building a vector?
     let mut tokens: Vec<&str> = Vec::new();
-    for tok in ls.trim().split_str(" ") { // TODO handle \t
+    for tok in ls.trim().split_str(" ") { // TODO handle \t and other whitespace
       if tok.starts_with("#") {
         break;
       } else if !tok.is_empty() {
@@ -103,10 +107,10 @@ pub fn read_scene(filename: &Path) -> ParseResult {
 
     let s = tokens[0];
     match s {
-      // TODO abstract colour type a bit
-      // Scene properties
-      // Not using guards since we check the result after parsing anyway?
-      // And it gives correct invalidity errors without extra effort
+      // Parse scene properties
+      
+      // Not using guards since we check the result after parsing anyway
+      // and it gives correct invalidity errors without extra effort
       "imagesize" => {
         in_object = false;
         let dims: Vec<u16> = tokens.tail().iter().filter_map(|&s| from_str::<u16>(s)).collect();
@@ -204,7 +208,7 @@ pub fn read_scene(filename: &Path) -> ParseResult {
 
       },
 
-      // TODO put in a function and use try! ?
+      // TODO put in a function and use try!
       "outer"     if in_object && n == 11 => {
         let colours: Vec<f32> = tokens[1..10].iter().filter_map(|&s| from_str::<f32>(s)).collect();
         let phong_n =  match from_str::<u8>(tokens[10]) {

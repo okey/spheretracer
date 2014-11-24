@@ -2,9 +2,14 @@
 use std::fmt::{Show,Result,Formatter};
 use mat4;
 
+/* This module is for a three dimensioal vector implementation that includes a homogenous
+ * coordinate for use with transforms.
+ */
+
 // Vec3 could be an array type... but then I can't implement traits without either containing it
 // or using newtype. The former is ugly and the latter is tedious because
 // Consider rewrite when newtype stuff gets added or if Rust adds properties
+#[deriving(PartialEq)]
 pub struct Vec3 {
   pub x: f64,
   pub y: f64,
@@ -12,6 +17,7 @@ pub struct Vec3 {
   pub w: f64
 }
 
+/* Construction macros */
 macro_rules! vector_h(
   ($x:expr $y:expr $z:expr $w:expr) => { Vec3 { x: $x, y: $y, z: $z, w: $w } };
   ($a:expr $w:expr) => { Vec3 { x: $a[0], y: $a[1], z: $a[2], w: $w } };
@@ -30,6 +36,13 @@ macro_rules! point(
   () => { vector_h!(0f64 0f64 0f64 1f64) };
 )
 
+/* Public functions */
+pub fn parametric_position(u: &Vec3, v: &Vec3, t: f64) -> Vec3{
+  *u + (*v * t)
+}
+
+
+/* Standard trait implementations */
 impl Show for Vec3 {
   fn fmt(&self, f: &mut Formatter) -> Result {
     write!(f, "(x:{}, y:{}, z:{}, w:{})", self.x, self.y, self.z, self.w)
@@ -75,14 +88,9 @@ impl Mul<f64, Vec3> for Vec3 {
   }
 }
 
+/* Custom traits */
 pub trait Apply {
   fn apply(&self, f: |f64| -> f64) -> Self;
-}
-
-impl Apply for Vec3 {
-  fn apply(&self, f: |f64| -> f64) -> Vec3 {
-    Vec3 { x: f(self.x), y: f(self.y), z: f(self.z), w: self.w }
-  }
 }
 
 // vec / f64 is semantically different, and f64 / vec doesn't work because the compiler
@@ -91,24 +99,51 @@ pub trait AsDivisorOf {
   fn as_divisor_of(&self, f: f64) -> Self;
 }
 
+pub trait DotProduct {
+  fn dot(&self, rhs: &Self) -> f64;
+}
+
+pub trait CrossProduct {
+  fn cross(&self, rhs: &Self) -> Self;
+}
+
+pub trait Magnitude {
+  fn magnitude(&self) -> f64;
+}
+
+pub trait Normalise {
+  fn normalise(&self) -> Self;
+}
+
+pub trait Transform {
+  fn transform(&self, t: &mat4::Matrix) -> Self;
+}
+
+pub trait AsVector {
+  fn as_vector(&self) -> Self;
+}
+
+pub trait AsPoint {
+  fn as_point(&self) -> Self;
+}
+
+/* Custom trait implementations */
+impl Apply for Vec3 {
+  fn apply(&self, f: |f64| -> f64) -> Vec3 {
+    Vec3 { x: f(self.x), y: f(self.y), z: f(self.z), w: self.w }
+  }
+}
+
 impl AsDivisorOf for Vec3 {
   fn as_divisor_of(&self, f: f64) -> Vec3 {
     self.apply(|c| f / c)
   }
 }
 
-pub trait DotProduct {
-  fn dot(&self, rhs: &Self) -> f64;
-}
-
 impl DotProduct for Vec3 {
   fn dot(&self, rhs: &Vec3) -> f64 {
     self.x * rhs.x + self.y * rhs.y + self.z * rhs.z
   }
-}
-
-pub trait CrossProduct {
-  fn cross(&self, rhs: &Self) -> Self;
 }
 
 impl CrossProduct for Vec3 {
@@ -122,28 +157,16 @@ impl CrossProduct for Vec3 {
   }
 }
 
-pub trait Magnitude {
-  fn magnitude(&self) -> f64;
-}
-
 impl Magnitude for Vec3 {
   fn magnitude(&self) -> f64 {
     self.dot(self).sqrt()
   }
 }
 
-pub trait Normalise {
-  fn normalise(&self) -> Self;
-}
-
 impl Normalise for Vec3 {
   fn normalise(&self) -> Vec3 {
     self.mul(&(1.0 / self.magnitude()))
   }
-}
-
-pub trait Transform {
-  fn transform(&self, t: &mat4::Matrix) -> Self;
 }
 
 impl Transform for Vec3 {
@@ -161,26 +184,14 @@ impl Transform for Vec3 {
   }
 }
 
-pub trait AsVector {
-  fn as_vector(&self) -> Self;
-}
-
 impl AsVector for Vec3 {
   fn as_vector(&self) -> Vec3 {
     return Vec3 { x: self.x, y: self.y, z: self.z, w: 0.0 }
   }
 }
 
-pub trait AsPoint {
-  fn as_point(&self) -> Self;
-}
-
 impl AsPoint for Vec3 {
   fn as_point(&self) -> Vec3 {
     return Vec3 { x: self.x, y: self.y, z: self.z, w: 1.0 }
   }
-}
-
-pub fn parametric_position(u: &Vec3, v: &Vec3, t: f64) -> Vec3{
-  *u + (*v * t)
 }

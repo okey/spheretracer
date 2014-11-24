@@ -14,8 +14,9 @@ macro_rules! colour(
 pub const BLACK: Colour = colour!();
 pub const WHITE: Colour = colour!(1.0 1.0 1.0);
 
-
-#[deriving(Clone)]
+// Each channel is intended to be in [0.0,1.0]. Call colour_clamp to enforce this
+// 32-bit floats are used for direct compatibility with GLfloat
+#[deriving(PartialEq)]
 pub struct Colour {
     pub red: f32,
     pub green: f32,
@@ -23,32 +24,56 @@ pub struct Colour {
     // no alpha for now
 }
 
+/* Private functions */
 fn clamp(f: f32) -> f32 {
   if f < 0.0 { 0.0 }
   else if f > 1.0 { 1.0 }
   else { f }
 }
 
+/* Public functions */
 pub fn colour_clamp(c: &Colour) -> Colour {
   Colour { red: clamp(c.red), green: clamp(c.green), blue: clamp(c.blue) }
 }
 
-// TODO operator overloading
-pub fn colour_scale(c: &Colour, s: f32) -> Colour {
-  colour!(c.red*s c.green*s c.blue*s)
+/* Custom traits and their implementations */
+trait Apply {
+  fn apply(&self, f: |f32| -> f32) -> Self;
 }
 
-pub fn colour_multiply(c: &Colour, d: &Colour) -> Colour {
-  colour!(c.red*d.red c.green*d.green c.blue*d.blue)
+trait Combine<T> {
+  fn combine(&self, b: &Self, f: |T, T| -> T) -> Self;
 }
 
-pub fn colour_add(c: &Colour, d: &Colour) -> Colour {
-  colour!(c.red+d.red c.green+d.green c.blue+d.blue)
+impl Apply for Colour {
+  fn apply(&self, f: |f32| -> f32) -> Colour {
+    colour!(f(self.red) f(self.green) f(self.blue))
+  }
 }
 
-// TODO EQ trait
-pub fn colour_eq(c: &Colour, d: &Colour) -> bool {
-  c.red == d.red && c.green == d.green && c.blue == d.blue
+impl Combine<f32> for Colour {
+  fn combine(&self, b: &Colour, f: |f32, f32| -> f32) -> Colour {
+    colour!(f(self.red, b.red) f(self.green, b.green) f(self.blue, b.blue))
+  }
+}
+
+/* Standard trait implementations */
+impl Mul<f32, Colour> for Colour {
+  fn mul(&self, rhs: &f32) -> Colour {
+    self.apply(|c| c * *rhs)
+  }
+}
+
+impl Mul<Colour, Colour> for Colour {
+  fn mul(&self, rhs: &Colour) -> Colour {
+    self.combine(rhs, |a, b| a * b)
+  }
+}
+
+impl Add<Colour, Colour> for Colour {
+  fn add(&self, rhs: &Colour) -> Colour {
+    self.combine(rhs, |a, b| a + b)
+  }
 }
 
 impl fmt::Show for Colour {

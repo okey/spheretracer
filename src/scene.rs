@@ -5,6 +5,7 @@ use colour::Colour;
 use mat4;
 use vec3::Vec3;
 
+/* Types */
 pub struct Light {
     pub position: Vec3,
     pub colour: Colour
@@ -34,8 +35,29 @@ pub struct Scene {
     pub spheres: Vec<Sphere>
 }
 
+/* Macros */
+macro_rules! material(
+    () => { Material { diffuse: colour!(), mirror: colour!(), phong: colour!(), phong_n: 1 } };
+)
 
+macro_rules! sphere(
+    () => {
+    Sphere { position: point!(), inner: material!(), outer: material!(), radius: 0f64,
+             transform: mat4::identity(), inverse_t: mat4::identity() }
+    };
+)
 
+/* Public functions */
+pub fn make_colour(v: &[f32]) -> Colour { // what about using a macro for consistency?
+  assert!(v.len() == 3);
+  colour!(v)
+}
+
+pub fn make_material(d: &[f32], m: &[f32], p: &[f32], n: u8) -> Material {
+    Material { diffuse: make_colour(d), mirror: make_colour(m), phong: make_colour(p), phong_n: n }
+}
+
+/* Standard trait implementations */
 impl fmt::Show for Light {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "\nposition {}, colour {}", self.position, self.colour)
@@ -60,24 +82,4 @@ impl fmt::Show for Scene {
                self.image_size, self.ambient, self.background,
                self.lights.len(), self.lights, self.spheres.len(), self.spheres)
     }
-}
-
-macro_rules! material(
-    () => { Material { diffuse: colour!(), mirror: colour!(), phong: colour!(), phong_n: 1 } };
-)
-
-macro_rules! sphere(
-    () => {
-    Sphere { position: point!(), inner: material!(), outer: material!(), radius: 0f64,
-             transform: mat4::identity(), inverse_t: mat4::identity() }
-    };
-)
-
-pub fn make_colour(v: &[f32]) -> Colour { // what about using a macro for consistency?
-  assert!(v.len() == 3);
-  colour!(v)
-}
-
-pub fn make_material(d: &[f32], m: &[f32], p: &[f32], n: u8) -> Material {
-    Material { diffuse: make_colour(d), mirror: make_colour(m), phong: make_colour(p), phong_n: n }
 }

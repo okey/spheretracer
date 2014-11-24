@@ -5,11 +5,17 @@ use vec3::{Vec3,Normalise};
 
 pub const DIM: uint = 4;
 
-pub type Matrix = [[f64, ..DIM], ..DIM];
 // if I want to add traits for this I need to use a newtype...
 // and then manually add all the inner type traits...
 // TODO wait for Rust to fix this
+pub type Matrix = [[f64, ..DIM], ..DIM];
 
+/* Private functions */
+fn zero() -> Matrix {
+  [[0.0, ..DIM], ..DIM]
+}
+
+/* Public functions */
 pub fn identity() -> Matrix {
   [[1.0, 0.0, 0.0, 0.0],
    [0.0, 1.0, 0.0, 0.0],
@@ -17,10 +23,7 @@ pub fn identity() -> Matrix {
    [0.0, 0.0, 0.0, 1.0]]
 }
 
-fn zero() -> Matrix {
-  [[0.0, ..DIM], ..DIM]
-}
-
+// Can't implement Show trait for this type yet -- see type declaration
 pub fn matrix_print(a: &Matrix, title: &str) {
   println!("{}", title);
 
