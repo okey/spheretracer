@@ -11,12 +11,13 @@ It supports supersampled antialiasing, random light sampling (soft shadows), and
 
 ### Scene files
 ```
-###
 # Example scene file - this is a comment
 # The basic format per-line: keyword x y z
-# Colours are r g b with chroma and intensity together as rgb [0.0,1.0]
 
-imagesize 800 600 # this is also a comment
+# Chroma and intensity colour values are combined as simple RGB
+# Each channel value should be in [0.0, 1.0]
+
+imagesize 800 600 # image size specifies the size of the image to be rendered
 background 0.2 0.4 0.6 # this is the background colour
 ambient 0.2 0.2 0.2 # this is the ambient lighting
 
