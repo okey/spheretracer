@@ -13,11 +13,12 @@ It supports supersampled antialiasing, random light sampling (soft shadows), and
 ```
 ###
 # Example scene file - this is a comment
+# The basic format per-line: keyword x y z
+# Colours are r g b with chroma and intensity together as rgb [0.0,1.0]
 
-# Image
 imagesize 800 600 # this is also a comment
 background 0.2 0.4 0.6 # this is the background colour
-ambient 0.2 0.2 0.2 # this is the ambient lighting - chroma and intensity together as rgb [0.0,1.0]
+ambient 0.2 0.2 0.2 # this is the ambient lighting
 
 # A specify a light with light x y z r g b 
 light  0.0 0.5 1.0   1.0 1.0 1.0
