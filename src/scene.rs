@@ -3,10 +3,10 @@ use std::fmt;
 
 use colour::Colour;
 use mat4;
-use vec4::Vec4;
+use vec3::Vec3;
 
 pub struct Light {
-    pub position: Vec4,
+    pub position: Vec3,
     pub colour: Colour
 }
 
@@ -18,7 +18,7 @@ pub struct Material {
 }
 
 pub struct Sphere {
-    pub position: Vec4,
+    pub position: Vec3,
     pub inner: Material,
     pub outer: Material,
     pub radius: f64,
@@ -57,7 +57,8 @@ impl fmt::Show for Sphere {
 impl fmt::Show for Scene {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "\nimage_size {}\nambient {}\nbackground {}\nlights {} {}\nspheres {} {}",
-               self.image_size, self.ambient, self.background, self.lights.len(), self.lights, self.spheres.len(), self.spheres)
+               self.image_size, self.ambient, self.background,
+               self.lights.len(), self.lights, self.spheres.len(), self.spheres)
     }
 }
 

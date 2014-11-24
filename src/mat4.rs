@@ -1,14 +1,14 @@
 use std::num::FloatMath;
 use std::f64 as stdf64;
 
-use vec4::{Vec4,Normalise};
+use vec3::{Vec3,Normalise};
 
 pub const DIM: uint = 4;
 
 pub type Matrix = [[f64, ..DIM], ..DIM];
 // if I want to add traits for this I need to use a newtype...
 // and then manually add all the inner type traits...
-// blergh
+// TODO wait for Rust to fix this
 
 pub fn identity() -> Matrix {
   [[1.0, 0.0, 0.0, 0.0],
@@ -24,7 +24,6 @@ fn zero() -> Matrix {
 pub fn matrix_print(a: &Matrix, title: &str) {
   println!("{}", title);
 
-  // there has got to be a way to do this purely using iter() and map() and co.
   for row in a.iter() {
     let str: Vec<String> = row.iter().map(|&v| stdf64::to_str_exact(v, 3u)).collect();
     println!("{}", str);
@@ -44,16 +43,6 @@ pub fn multiply(a: &Matrix, b: &Matrix) -> Matrix {
   result
 }
 
-/*pub fn add(a: &Matrix, b: &Matrix) -> Matrix {
-    let mut result = zero();
-    for row in range(0, DIM) {
-        for col in range(0, DIM) {
-            result[row][col] = a[row][col] + b[row][col];
-        }
-    }
-    result
-}
-*/
 pub fn transpose(a: &Matrix) -> Matrix {
   let mut result = zero();
   for row in range(0, DIM) {
@@ -64,7 +53,7 @@ pub fn transpose(a: &Matrix) -> Matrix {
   result
 }
 
-pub fn translate(v: &Vec4) -> Matrix {
+pub fn get_translation(v: &Vec3) -> Matrix {
   let mut result = identity();
   result[0][3] = v.x;
   result[1][3] = v.y;
@@ -73,7 +62,7 @@ pub fn translate(v: &Vec4) -> Matrix {
   result
 }
 
-pub fn scale(v: &Vec4) -> Matrix {
+pub fn get_scale(v: &Vec3) -> Matrix {
   let mut result = identity();
   result[0][0] = v.x;
   result[1][1] = v.y;
@@ -82,7 +71,7 @@ pub fn scale(v: &Vec4) -> Matrix {
   result
 }
 
-pub fn rotate(axis: &Vec4, rads: f64) -> Matrix {
+pub fn get_rotation(axis: &Vec3, rads: f64) -> Matrix {
   let mut result = identity();
 
   let sinr = FloatMath::sin(rads);

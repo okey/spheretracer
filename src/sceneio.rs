@@ -5,7 +5,7 @@ use std::path::Path;
 use std::fmt;
 
 use mat4;
-use vec4::{AsDivisorOf,Vec4}; // TODO Clean trait usage up when UFCS is implemented in Rust
+use vec3::{AsDivisorOf,Vec3}; // TODO Clean up trait usage when UFCS is implemented in Rust
 use colour;
 use colour::Colour;
 use scene::{Scene,Light,Material,Sphere,make_colour,make_material};
@@ -20,7 +20,6 @@ enum ParseErrorKind {
   InvalidLine,
 }
 
-// possibly not worthwhile
 #[deriving(Show)]
 enum LineNumber<T> {
   Line(T),
@@ -238,8 +237,8 @@ pub fn read_scene(filename: &Path) -> ParseResult {
         };
 
         if offsets.len() == 3 {
-          let this_t = mat4::translate(&vector!(offsets));
-          let this_i = mat4::translate(&(vector!(offsets) * -1.0));
+          let this_t = mat4::get_translation(&vector!(offsets));
+          let this_i = mat4::get_translation(&(vector!(offsets) * -1.0));
 
           // premultiply T and postmultiply Inv
           sphere.transform = mat4::multiply(&this_t, &sphere.transform);
@@ -260,8 +259,8 @@ pub fn read_scene(filename: &Path) -> ParseResult {
         };
 
         if offsets.len() == 3 {
-          let this_t = mat4::scale(&vector!(offsets));
-          let this_i = mat4::scale(&vector!(offsets).as_divisor_of(1.0));
+          let this_t = mat4::get_scale(&vector!(offsets));
+          let this_i = mat4::get_scale(&vector!(offsets).as_divisor_of(1.0));
 
           // premultiply T and postmultiply Inv
           sphere.transform = mat4::multiply(&this_t, &sphere.transform);
@@ -293,8 +292,8 @@ pub fn read_scene(filename: &Path) -> ParseResult {
                                        line: Line(line_num) })
         };
 
-        let this_t = mat4::rotate(&axis, angle_r);
-        let this_i = mat4::rotate(&axis, -1.0 * angle_r);
+        let this_t = mat4::get_rotation(&axis, angle_r);
+        let this_i = mat4::get_rotation(&axis, -1.0 * angle_r);
 
 
         // premultiply T and postmultiply Inv

@@ -16,14 +16,14 @@ use glfw::Context;
 use sceneio::read_scene;
 // todo fix namespace
 use mat4::transpose;
-use vec4::{Vec4,DotProduct,Normalise,Transform,AsVector,Apply};
+use vec3::{Vec3,DotProduct,Normalise,Transform,AsVector,Apply};
 // TODO clean up trait usage once UFCS has been implemented in Rust
 use colour::{Colour};
 use scene::{Sphere,Material};
 
-// module definition order matters for macro exports!
+// NOTE module definition order matters for macro exports!
 mod colour;
-mod vec4;
+mod vec3;
 mod mat4;
 mod scene;
 mod sceneio;
@@ -34,7 +34,7 @@ mod shaders;
 const COLOUR_WIDTH:uint = 4;
 const VERTEX_WIDTH:uint = 2;
 
-fn make_gl_proj_mat(width: uint, height: uint) -> [GLfloat, ..16] {
+fn make_gl_ortho_mat(width: uint, height: uint) -> [GLfloat, ..16] {
   let mut m:[GLfloat, ..16] = [0.0, ..16];
   let w = width as f32;
   let h = height as f32;
@@ -67,7 +67,7 @@ fn gl_init_and_render(scene: &scene::Scene) {
 
   let glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
 
-  // Choose a GL profile that is compatible with OS X 10.7+
+  // Select GL profile; this one should be cross-platform
   glfw.window_hint(glfw::ContextVersion(3, 2));
   glfw.window_hint(glfw::OpenglForwardCompat(true));
   glfw.window_hint(glfw::OpenglProfile(glfw::OpenGlCoreProfile));
@@ -76,7 +76,7 @@ fn gl_init_and_render(scene: &scene::Scene) {
   let (window, _) = glfw.create_window(wx as u32, wy as u32, "OpenGL", glfw::Windowed)
     .expect("Failed to create GLFW window.");
 
-  // It is essential to make the context current before calling `gl::load_with`.
+  // Must do this before loading function pointers
   window.make_current();
 
   // Load the OpenGL function pointers
@@ -88,8 +88,7 @@ fn gl_init_and_render(scene: &scene::Scene) {
   let program = shaders::link_program(vs, fs);
   let mut vao = 0;
   
-  // Add a vertex at every pixel... seems to cause issues at any res other than 800x600
-  // TODO try building a texture instead
+  // Add a vertex at every pixel... simple but not idiomatic OpenGL
   let mut vbo = 0;
   let wy2 = wy * VERTEX_WIDTH;
   let vertex_data_vec: Vec<GLfloat> = Vec::from_fn(wx * wy2, |n| {
@@ -99,7 +98,6 @@ fn gl_init_and_render(scene: &scene::Scene) {
     v + 0.5
   });
   let vertex_data = vertex_data_vec.as_slice();
-  println!("{}", vertex_data[wx * wy2 - 4..]);
   
   // Add a colour for each vertex
   let mut cbo = 0;
@@ -135,7 +133,9 @@ fn gl_init_and_render(scene: &scene::Scene) {
                    mem::transmute(&colour_data[0]),
                    gl::STATIC_DRAW);
 
+    // Select the program
     gl::UseProgram(program);
+
     // Bind fragment shader
     "out_colour".with_c_str(|ptr| gl::BindFragDataLocation(program, 0, ptr));
 
@@ -148,7 +148,7 @@ fn gl_init_and_render(scene: &scene::Scene) {
 
 
     // Set up the projection manually because we don't have glm or glu
-    let proj = make_gl_proj_mat(wx, wy);
+    let proj = make_gl_ortho_mat(wx, wy);
     let mvp_uni = "mvp".with_c_str(|ptr| gl::GetUniformLocation(program, ptr));
     
     // 3rd argument is transpose. GLES does not support this
@@ -163,23 +163,18 @@ fn gl_init_and_render(scene: &scene::Scene) {
                             gl::FALSE as GLboolean, 0, ptr::null());
   }
 
-  let mut progress = 0;
-  //println!("starting loop");
-  //while progress < colour_data.len() {
-  //  progress = render_step(scene, colour_data, progress);
-  //}
-  //println!("done");
-  let mut chunk = 0; // Render performance compromise: chunks
+  let mut chunk = 0;
   let chunk_size = wy * 4;
   let max_chunk = colour_data.len() / chunk_size;
   
-  // TODO fix crap performance by using streaming, mapping the buffer, or using framebuffers etc
-  // need to somehow decouple/desync changing the pixels and pushing to GPU
+  let mut render_progress = 0;
+  // TODO better GL performance for scenes that render quickly
+  // Streaming, mapping the buffer, or writing to a dynamic texture are a few options
   while !window.should_close() {
     glfw.poll_events();
     
-    while chunk <= max_chunk && progress < chunk_size * chunk {
-      progress = render_step(scene, colour_data, progress);
+    while chunk <= max_chunk && render_progress < chunk_size * chunk {
+      render_progress = render_step(scene, colour_data, render_progress);
     }
     chunk += 1;
 
@@ -208,11 +203,10 @@ fn gl_init_and_render(scene: &scene::Scene) {
 }
 
 type TestOpt = Option<(f64, f64)>;
-type HitS<'a> = (&'a scene::Sphere, f64, Vec4, bool); // REALLY should be a struct at this point
+type HitS<'a> = (&'a scene::Sphere, f64, Vec3, bool); // REALLY should be a struct at this point
 type HitSOpt<'a> = Option<HitS<'a>>;
 
-fn intersect_fixed_sphere(u: &Vec4, v: &Vec4, r: f64) -> TestOpt {
-  // TODO perf these are the same for each object for a ray, so could manually cache them
+fn intersect_fixed_sphere(u: &Vec3, v: &Vec3, r: f64) -> TestOpt {
   let uu = u.dot(u);
   let uv = u.dot(v);
   let vv = v.dot(v);
@@ -238,9 +232,9 @@ fn intersect_fixed_sphere(u: &Vec4, v: &Vec4, r: f64) -> TestOpt {
   Some((t1, t2))
 }
 
-fn intersect_sphere<'a>(sphere: &'a scene::Sphere,  u: &Vec4, v: &Vec4) -> HitSOpt<'a> {
-  let uprime = u.transform(&sphere.inverse_t);//transform_multiply(&sphere.inverse_t, u);
-  let vprime = v.transform(&sphere.inverse_t);//transform_multiply(&sphere.inverse_t, v);
+fn intersect_sphere<'a>(sphere: &'a scene::Sphere,  u: &Vec3, v: &Vec3) -> HitSOpt<'a> {
+  let uprime = u.transform(&sphere.inverse_t);
+  let vprime = v.transform(&sphere.inverse_t);
 
   match intersect_fixed_sphere(&uprime, &vprime, sphere.radius) {
     Some(x) => {
@@ -254,7 +248,7 @@ fn intersect_sphere<'a>(sphere: &'a scene::Sphere,  u: &Vec4, v: &Vec4) -> HitSO
       else if t2 >= 0.0 { (t2, false) }
       else { return None };
 
-      let h = vec4::parametric_position(&uprime, &vprime, t);
+      let h = vec3::parametric_position(&uprime, &vprime, t);
       
       Some((sphere, t, h, outside))
     },
@@ -262,18 +256,17 @@ fn intersect_sphere<'a>(sphere: &'a scene::Sphere,  u: &Vec4, v: &Vec4) -> HitSO
   }
 }
 
-fn soft_shadow_scale(scene: &scene::Scene, light: &scene::Light, hit_u: &Vec4) -> f64 {
+fn soft_shadow_scale(scene: &scene::Scene, light: &scene::Light, hit_u: &Vec3) -> f64 {
   const SOFT_SHADOW_SAMPLES: uint = 20;
   const SOFT_SHADOW_COEFF: f64 = 0.05;
   
-  // TODO cache and pass ref to this
-  let rng = rand::random::<f64>;
+  let rng = rand::random::<f64>; // TODO investigate performance of doing this here
 
   // Jitter the light position by +/-0.5 * coeff in each axis to model lights with area
   let light_i_fn = if SOFT_SHADOW_SAMPLES == 1 {
-    |p: &Vec4| *p - *hit_u // No jitter if we are only taking one sample (i.e. no soft shadows)
+    |p: &Vec3| *p - *hit_u // No jitter if we are only taking one sample (i.e. no soft shadows)
   } else {
-    |p: &Vec4| p.apply(|c: f64| c + (rng() - 0.5) * SOFT_SHADOW_COEFF) - *hit_u
+    |p: &Vec3| p.apply(|c: f64| c + (rng() - 0.5) * SOFT_SHADOW_COEFF) - *hit_u
   };
   
   // Random sampling. Maybe a different distribution would look better?      
@@ -300,11 +293,12 @@ fn soft_shadow_scale(scene: &scene::Scene, light: &scene::Light, hit_u: &Vec4) -
 // n_hat is the surface normal at the hitpoint
 // v_hat is the vector from the hitpoint back to the viewpoint
 fn illuminate_hit(scene: &scene::Scene, material: &scene::Material,
-                  hit_u: &Vec4, n_hat: &Vec4, v_hat: &Vec4) -> Colour {
+                  hit_u: &Vec3, n_hat: &Vec3, v_hat: &Vec3) -> Colour {
   // Ambient lighting
   // TODO no ambient component inside of a sphere unless it is transparent
   let mut result_colour = colour::colour_multiply(&material.diffuse, &scene.ambient);
 
+  // TODO extract vector reflection outside of lights loop by changing which vector gets reflected
   for light in scene.lights.iter() {
     // i_hat is a unit vector in direction of light source
     let i_hat = (light.position - *hit_u).normalise();
@@ -316,7 +310,6 @@ fn illuminate_hit(scene: &scene::Scene, material: &scene::Material,
     let ni = n_hat.dot(&i_hat) * soften_scale;
     if ni > 0.0 { 
       let diff_light = colour::colour_scale(&light.colour, ni as f32);
-      // could extract the following multiplication outside the loop 
       let diff_part = colour::colour_multiply(&diff_light, &material.diffuse);
       result_colour = colour::colour_add(&result_colour, &diff_part);
     }
@@ -325,7 +318,6 @@ fn illuminate_hit(scene: &scene::Scene, material: &scene::Material,
     // r_hat is a unit vector of the light vector reflected about the normal
     let n_perp2 = *n_hat * (2.0 * i_hat.dot(n_hat));
     let r_hat = (n_perp2 - i_hat).normalise();
-    // TODO extract vector reflection outside of lights loop by changing which vector we reflect
 
     let rv = v_hat.dot(&r_hat) * soften_scale;
     if rv > 0.0 {
@@ -340,8 +332,8 @@ fn illuminate_hit(scene: &scene::Scene, material: &scene::Material,
   result_colour
 }
 
-fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4, depth: uint) -> Colour {
-  // Stop mirror ray recursion
+fn trace_ray(scene: &scene::Scene, u: &Vec3, v: &Vec3, depth: uint) -> Colour {
+  // Stop mirror ray recursion at a fixed depth
   if depth == 0 { return colour::BLACK; }
 
   // Find all objects that lie in the path of the ray for non -ve t
@@ -349,20 +341,19 @@ fn trace_ray(scene: &scene::Scene, u: &Vec4, v: &Vec4, depth: uint) -> Colour {
     .filter_map(|s| intersect_sphere(s, u, v))
     .collect::<Vec<HitS>>();
   
-  // Could multiply this with the ambient if desired
+  // Trace the background colour in the abscence of any objects
   if hits.len() == 0 { return scene.background; }
   
   
   // Take the closest hit and extract the result
-  let fake_s = sphere!();
-  let fake_h = (&fake_s, std::f64::MAX_VALUE, vector!(), false);
-  let hit = hits.iter().fold(fake_h, |s, h| { if h.val1() < s.val1() { *h } else { s }});
+  let max_h = (&sphere!(), std::f64::MAX_VALUE, vector!(), false);
+  let hit = hits.iter().fold(max_h, |s, h| { if h.val1() < s.val1() { *h } else { s }});
 
   let sphere = &hit.val0();
   let material = if hit.val3() { sphere.outer } else { sphere.inner };
   
   // Find the hit position, surface normal at the hit position, and reverse viewpoint vectors
-  let hit_u = vec4::parametric_position(u, v, hit.val1() * 0.9999);
+  let hit_u = vec3::parametric_position(u, v, hit.val1() * 0.9999);
   let n_hat = hit.val2().as_vector().transform(&mat4::transpose(&sphere.inverse_t)).normalise();
   let v_hat = (*u - hit_u).normalise();
 

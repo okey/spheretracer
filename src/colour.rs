@@ -1,14 +1,6 @@
 #![macro_escape]
 use std::fmt;
 
-/*macro_rules! clamp(
-  ($a:expr) => {
-    if $a < 0.0 { 0.0 }
-    else if $a > 1.0 { 1.0 }
-    else { $a }
-  };
-)*/
-
 macro_rules! colour(
   ($r:expr $g:expr $b:expr) => { Colour { red:   $r,
                                           green: $g,
@@ -19,9 +11,7 @@ macro_rules! colour(
   () => { Colour { red: 0.0, green: 0.0, blue: 0.0 } };
 )
 
-#[warn(dead_code)]
 pub const BLACK: Colour = colour!();
-#[warn(dead_code)]
 pub const WHITE: Colour = colour!(1.0 1.0 1.0);
 
 
