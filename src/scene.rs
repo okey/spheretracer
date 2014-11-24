@@ -1,7 +1,7 @@
 #![macro_escape]
 use std::fmt;
 
-use colour::Colour;
+use colour::{Colour,Clamp};
 use mat4;
 use vec3::Vec3;
 
@@ -52,7 +52,8 @@ macro_rules! sphere(
 /* Public functions */
 pub fn make_colour(v: &[f32]) -> Colour { // what about using a macro for consistency?
   assert!(v.len() == 3);
-  colour!(v)
+  let c = colour!(v);
+  c.clamp()
 }
 
 pub fn make_material(d: &[f32], m: &[f32], p: &[f32], n: u8) -> Material {
