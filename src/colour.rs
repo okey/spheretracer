@@ -24,18 +24,6 @@ pub struct Colour {
     // no alpha for now
 }
 
-/* Private functions */
-fn clamp(f: f32) -> f32 {
-  if f < 0.0 { 0.0 }
-  else if f > 1.0 { 1.0 }
-  else { f }
-}
-
-/* Public functions */
-pub fn colour_clamp(c: &Colour) -> Colour {
-  Colour { red: clamp(c.red), green: clamp(c.green), blue: clamp(c.blue) }
-}
-
 /* Custom traits and their implementations */
 trait Apply {
   fn apply(&self, f: |f32| -> f32) -> Self;
@@ -43,6 +31,10 @@ trait Apply {
 
 trait Combine<T> {
   fn combine(&self, b: &Self, f: |T, T| -> T) -> Self;
+}
+
+pub trait Clamp {
+  fn clamp(&self) -> Self;
 }
 
 impl Apply for Colour {
@@ -54,6 +46,12 @@ impl Apply for Colour {
 impl Combine<f32> for Colour {
   fn combine(&self, b: &Colour, f: |f32, f32| -> f32) -> Colour {
     colour!(f(self.red, b.red) f(self.green, b.green) f(self.blue, b.blue))
+  }
+}
+
+impl Clamp for Colour {
+  fn clamp(&self) -> Colour {
+    self.apply(|c| if c > 1.0 { 1.0 } else if c < 0.0 { 0.0} else { c })
   }
 }
 
@@ -83,4 +81,42 @@ impl fmt::Show for Colour {
                (self.green * 255.0) as u8,
                (self.blue * 255.0) as u8)
     }
+}
+
+/* Unit tests */
+#[cfg(test)]
+mod test {
+  
+  use super::*;
+  use super::{Apply};
+
+  #[test]
+  fn colour_eq() {
+    assert!(BLACK != WHITE);
+  }
+
+  #[test]
+  fn colour_add() {
+    let red = colour!(1.0 0.0 0.0);
+    let blue = colour!(0.0 0.0 1.0);
+    let purple = colour!(1.0 0.0 1.0);
+
+    assert!(red + blue == purple);
+  }
+
+  #[test]
+  fn colour_mul() {
+    let grey = colour!(0.5 0.5 0.5);
+
+    assert!(grey == WHITE * 0.5);
+  }
+
+  #[test]
+  fn colour_clamp() {
+    let overload = WHITE + WHITE;
+    let underload = BLACK.apply(|c| c - 1.0);
+
+    assert!(overload.clamp() == WHITE);
+    assert!(underload.clamp() == BLACK);
+  }
 }

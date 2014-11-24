@@ -17,17 +17,17 @@ use sceneio::read_scene;
 use mat4::transpose;
 use vec3::{Vec3,DotProduct,Normalise,Transform,AsVector,Apply};
 // TODO clean up trait usage once UFCS has been implemented in Rust
-use colour::{Colour};
+use colour::{Colour,Clamp};
 use scene::{Sphere,Material};
 
 // NOTE module definition order matters for macro exports!
-mod colour;
-mod vec3;
-mod mat4;
-mod scene;
+pub mod colour;
+pub mod vec3;
+pub mod mat4;
+pub mod scene;
 mod sceneio;
 
-mod shaders;
+pub mod shaders;
 
 /* The number of components expected per value (colour or position) in the data arrays drawn */
 const COLOUR_WIDTH:uint = 4;
@@ -382,7 +382,7 @@ fn trace_ray(scene: &scene::Scene, u: &Vec3, v: &Vec3, depth: uint) -> Colour {
 
   // TODO transparency
 
-  return colour::colour_clamp(&result_colour);
+  return result_colour.clamp();
 }
 
 /* Trace a position on screen given our progress so far, then update the colour array */
@@ -472,6 +472,7 @@ fn load_scene_or_fail(filename: &Path) -> scene::Scene {
   scene
 }
 
+#[allow(dead_code)] // to silence test warnings
 fn main() {
   let args = os::args();
   let print_usage = args.len() != 2u;

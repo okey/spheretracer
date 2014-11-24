@@ -106,3 +106,108 @@ pub fn get_rotation(axis: &Vec3, rads: f64) -> Matrix {
 
   result
 }
+
+/* Unit tests */
+#[cfg(test)]
+mod test {
+  use super::*;
+  use std::f64::consts;
+  use vec3::Vec3;
+  
+  #[test]
+  fn mat4_zero() {
+    let m = super::zero();
+    let s = m.iter().flat_map(|x| x.iter()).fold(0.0, |sum, &e| sum + e);
+    assert!(s == 0.0);
+  }
+
+  #[test]
+  fn mat4_identity() {
+    let m = super::identity();
+    let s = m.iter().flat_map(|x| x.iter()).fold(0.0, |sum, &e| sum + e);
+
+    for x in range(0, DIM) {
+      assert!(m[x][x] == 1.0);
+    }
+    
+    assert!(s == DIM as f64);
+  }
+
+  #[test]
+  fn mat4_transpose() {
+    let mut m = super::identity();
+    m[DIM - 1][0] = 5.0;
+    m[0][DIM - 1] = 4.0;
+
+    let n = super::transpose(&m);
+    let s = n.iter().flat_map(|x| x.iter()).fold(0.0, |sum, &e| sum + e);
+
+
+    for x in range(0, DIM) {
+      assert!(n[x][x] == 1.0);
+    }
+    assert!(n[DIM - 1][0] == 4.0);
+    assert!(n[0][DIM - 1] == 5.0);
+    assert!(s == DIM as f64 + 9.0);
+  }
+  
+  #[test]
+  fn mat4_rotate() {
+    let v = vector!(1.0 0.0 0.0);
+    let r = consts::PI / 2.0;
+    let m = super::get_rotation(&v, r);
+
+    let s = m.iter().flat_map(|x| x.iter()).fold(0.0, |sum, &e| sum + e);
+
+    assert!(m[0][0] == 1.0);
+    assert!(m[1][2] == -1.0);
+    assert!(m[2][1] == 1.0);
+    assert!(m[3][3] == 1.0);
+    assert!(s == 2.0);
+  }
+  
+  #[test]
+  fn mat4_translate() {
+    let v = vector!(1.0 2.0 3.0);
+    let m = super::get_translation(&v);
+
+    let s = m.iter().flat_map(|x| x.iter()).fold(0.0, |sum, &e| sum + e);
+
+    for x in range(0, DIM - 1) {
+      assert!(m[x][DIM - 1] == v[x]);
+    }
+    assert!(m[DIM - 1][DIM - 1] == 1.0);
+    assert!(s == 10.0);
+  }
+
+  #[test]
+  fn mat4_scale() {
+    let v = vector!(1.0 2.0 3.0);
+    let m = super::get_scale(&v);
+
+    let s = m.iter().flat_map(|x| x.iter()).fold(0.0, |sum, &e| sum + e);
+
+    for x in range(0, DIM - 1) {
+      assert!(m[x][x] == v[x]);
+    }
+    assert!(m[DIM - 1][DIM - 1] == 1.0);
+    assert!(s == 7.0)
+  }
+
+  #[test]
+  fn mat4_multiply() {
+    let m = super::identity();
+    let n = [[1.0, 2.0, 3.0, 4.0],
+             [5.0, 6.0, 7.0, 8.0],
+             [8.0, 7.0, 6.0, 5.0],
+             [4.0, 3.0, 2.0, 1.0]];
+
+    let o = super::multiply(&n, &m);
+    
+    for r in range(0, DIM) {
+      for c in range(0, DIM) {
+        assert!(o[r][c] == n[r][c]);
+      }
+    }
+  }
+}

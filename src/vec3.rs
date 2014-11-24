@@ -2,7 +2,7 @@
 use std::fmt::{Show,Result,Formatter};
 use mat4;
 
-/* This module is for a three dimensioal vector implementation that includes a homogenous
+/* This module is for a three dimensional vector implementation that includes a homogeneous
  * coordinate for use with transforms.
  */
 
@@ -195,3 +195,85 @@ impl AsPoint for Vec3 {
     return Vec3 { x: self.x, y: self.y, z: self.z, w: 1.0 }
   }
 }
+
+/* Unit tests */
+#[cfg(test)]
+mod test {
+  use super::*;
+  use std::f64::consts;
+  use mat4;
+  
+  #[test]
+  fn vec3_equality() {
+    let a  = vector!(1.0 2.0 3.0);
+    let a2 = vector!(1.0 2.0 3.0);
+    let a3 = point!(1.0 2.0 3.0);
+    let b  = vector!(4.0 5.0 6.0);
+    
+    assert!(a == a2);
+    assert!(a != b);
+    assert!(a != a3);
+  }
+
+  #[test]
+  fn vec3_simple_operators() {
+    let a  = vector!(1.0 2.0 3.0);
+    let b  = vector!(1.0 2.0 3.0);
+    let c  = vector!(10.0 10.0 10.0); 
+    let d  = vector!(1.0 1.0 1.0);
+    
+    assert!(a[0] == 1.0 && a[1] == 2.0 && a[2] == 3.0);
+    assert!(a + b == a * 2.0);
+    assert!(a + b - a == b);
+    assert!(c.as_divisor_of(10.0) == d);
+  }
+
+  #[test]
+  fn vec3_simple_algebra() {
+    let a  = vector!(3.0 4.0 0.0);
+    let b  = vector!(1.0 0.0 0.0);
+    let c  = vector!(0.0 1.0 0.0);
+    let d  = vector!(0.0 0.0 1.0);
+    
+    assert!(a.magnitude() == 5.0);
+    assert!(a.normalise().magnitude() == 1.0);
+    assert!(a.dot(&a) == a.magnitude() * a.magnitude());
+    assert!(b.cross(&c) == d);
+    assert!(c.cross(&d) == b);
+    assert!(d.cross(&b) == c);
+  }
+
+  #[test]
+  fn vec3_homogeneous() {
+    let a = vector_h!(1.0 2.0 3.0 4.0);
+    let b = vector!(4.0 5.0 6.0);
+    let c = a.as_point();
+    
+    assert!(a.as_vector().w == 0.0);
+    assert!(c.w == 1.0);
+    assert!((c - b).w == 1.0);
+    assert!((c + b).w == 1.0);
+    assert!((b - b).w == 0.0);
+    assert!((b + b).w == 0.0);
+    assert!((c - c).w == 0.0);
+    assert!((c + c).w == 0.0);
+  }
+
+  #[test]
+  fn vec3_transform() {
+    let a = point!(1.0 2.0 3.0);
+    let b = vector!(1.0 2.0 3.0);
+
+    let m = mat4::get_scale(&vector!(3.0 3.0 3.0));
+    let n = mat4::get_translation(&vector!(3.0 3.0 3.0));
+    let o = mat4::get_rotation(&vector!(1.0 0.0 0.0), consts::PI / 2.0);
+
+    let c = a.transform(&o).transform(&n).transform(&m);
+    let d = b.transform(&o).transform(&m);
+
+    let m9 = -9.0;
+    assert!(c == point!(12.0 0.0 15.0));
+    assert!(d == vector!(3.0 m9 6.0));
+  }
+}
+
