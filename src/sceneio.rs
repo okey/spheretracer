@@ -69,13 +69,16 @@ macro_rules! radians(
  * Warning: monolithic
  */
 pub fn read_scene(filename: &Path) -> ParseResult {
+  // constraint image_size to +ve, proper window setup will take care of the rest
+  const MIN_IMG_DIM: u16 = 1;
+
   let mut file = BufferedReader::new(File::open(filename));
   let mut line_num = 0u;
 
   // Default scene
   // TODO meaningful defaults
   let mut scene = Scene {
-    image_size: (1, 2),
+    image_size: (800, 600),
     ambient: colour::WHITE,
     background: colour::BLACK,
     lights: Vec::new(),
@@ -117,8 +120,10 @@ pub fn read_scene(filename: &Path) -> ParseResult {
         let dslice = dims.as_slice();
 
         scene.image_size = match dims.len() {
-          1 => (dslice[0], dslice[0]),
-          2 => (dslice[0], dslice[1]),
+          1 => if dslice[0] < MIN_IMG_DIM { (MIN_IMG_DIM, MIN_IMG_DIM) }
+                else { (dslice[0], dslice[0]) },
+          2 => (if dslice[0] < MIN_IMG_DIM { MIN_IMG_DIM } else { dslice[0] },
+                if dslice[1] < MIN_IMG_DIM { MIN_IMG_DIM } else { dslice[1] }),
           _ => return Err(ParseError { kind: InvalidLine, desc: ls.clone(), line: Line(line_num) })
         }
       },

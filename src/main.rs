@@ -71,8 +71,19 @@ fn gl_init_and_render(scene: &scene::Scene) {
   glfw.window_hint(glfw::OpenglProfile(glfw::OpenGlCoreProfile));
   glfw.window_hint(glfw::Resizable(false));
 
+  // TODO support optional fullscreen rendering
   let (window, _) = glfw.create_window(wx as u32, wy as u32, "OpenGL", glfw::Windowed)
     .expect("Failed to create GLFW window.");
+  let (real_wx, real_wy) =
+    match window.get_size() {
+      (x, y) if x as uint != wx || y as uint != wy => {
+        println!("Warning! Size {}x{} not windowable, rendering {}x{} instead",
+                 wx, wy, x, y);
+        (x as uint, y as uint)
+      },
+      
+      _ => (wx, wy)
+    };
 
   // Must do this before loading function pointers
   window.make_current();
@@ -88,8 +99,8 @@ fn gl_init_and_render(scene: &scene::Scene) {
   
   // Add a vertex at every pixel... simple but not idiomatic OpenGL
   let mut vbo = 0;
-  let wy2 = wy * VERTEX_WIDTH;
-  let vertex_data_vec: Vec<GLfloat> = Vec::from_fn(wx * wy2, |n| {
+  let wy2 = real_wy * VERTEX_WIDTH;
+  let vertex_data_vec: Vec<GLfloat> = Vec::from_fn(real_wx * wy2, |n| {
     let x = n / wy2;
     let y = n % wy2;
     let v = if y % 2 == 0 { x as f32 } else { (y / VERTEX_WIDTH) as f32};
@@ -99,8 +110,8 @@ fn gl_init_and_render(scene: &scene::Scene) {
   
   // Add a colour for each vertex
   let mut cbo = 0;
-  let wy4 = wy * COLOUR_WIDTH;
-  let mut colour_data_vec: Vec<GLfloat> = Vec::from_fn(wx * wy4, |n| {
+  let wy4 = real_wy * COLOUR_WIDTH;
+  let mut colour_data_vec: Vec<GLfloat> = Vec::from_fn(real_wx * wy4, |n| {
     match n % COLOUR_WIDTH {
       0 => (scene.background.red as f32   / 255.0) as GLfloat,
       1 => (scene.background.green as f32 / 255.0) as GLfloat,
@@ -146,7 +157,7 @@ fn gl_init_and_render(scene: &scene::Scene) {
 
 
     // Set up the projection manually because we don't have glm or glu
-    let proj = make_gl_ortho_mat(wx, wy);
+    let proj = make_gl_ortho_mat(real_wx, real_wy);
     let mvp_uni = "mvp".with_c_str(|ptr| gl::GetUniformLocation(program, ptr));
     
     // 3rd argument is transpose. GLES does not support this
@@ -163,7 +174,7 @@ fn gl_init_and_render(scene: &scene::Scene) {
 
   // Do the raytracing in chunks so we can watch it happen on screen
   let mut chunk = 0;
-  let chunk_size = wy * 4;
+  let chunk_size = real_wy * 4;
   let max_chunk = colour_data.len() / chunk_size;
   
   let mut render_progress = 0;
@@ -173,7 +184,7 @@ fn gl_init_and_render(scene: &scene::Scene) {
     glfw.poll_events();
     
     while chunk <= max_chunk && render_progress < chunk_size * chunk {
-      render_progress = render_step(scene, colour_data, render_progress);
+      render_progress = render_step(scene, colour_data, render_progress, real_wx, real_wy);
     }
     chunk += 1;
     
@@ -203,7 +214,8 @@ fn gl_init_and_render(scene: &scene::Scene) {
 }
 
 /* Trace a position on screen given our progress so far, then update the colour array */
-fn render_step(scene: &scene::Scene, colour_data: &mut [GLfloat], progress: uint) -> uint {
+fn render_step(scene: &scene::Scene, colour_data: &mut [GLfloat], progress: uint,
+               wx: uint, wy: uint) -> uint {
   // Some values from this function could be hoisted but the gains from doing so are probably
   // trivial compared to the cost of tracing
 
@@ -212,18 +224,15 @@ fn render_step(scene: &scene::Scene, colour_data: &mut [GLfloat], progress: uint
   // translate by w/2 and h/2 and then scale back to plane of -1,-1 to 1,1 
   // to transform from my screen space (RH system, origin in bottom left, w * h size
 
-  const SSAA_SAMPLES: uint = 3;
+  const SSAA_SAMPLES: uint = 1;
   assert!(SSAA_SAMPLES > 0 && SSAA_SAMPLES % 2 == 1); // must be a +ve odd integer
   const SSAA_SAMPLES_SQ: f32 = SSAA_SAMPLES as f32 * SSAA_SAMPLES as f32;
   
   const DEPTH_MAX: uint = 5;
   assert!(DEPTH_MAX > 0); // 0 would produce an entirely black image
 
-  let wx = scene.image_size.val0() as int;
-  let wy = scene.image_size.val1() as int;
-
-  let row = progress as int / (COLOUR_WIDTH as int * wy);
-  let col = (progress as int % (COLOUR_WIDTH as int * wy)) / COLOUR_WIDTH as int;
+  let row =  progress / (COLOUR_WIDTH * wy);
+  let col = (progress % (COLOUR_WIDTH * wy)) / COLOUR_WIDTH;
 
   let hx = wx / 2;
   let hy = wy / 2;
@@ -263,11 +272,11 @@ fn render_step(scene: &scene::Scene, colour_data: &mut [GLfloat], progress: uint
   colour = colour * (1.0 / SSAA_SAMPLES_SQ);
 
   // Update the colour array with the result
-  colour_data[progress] = colour.red;
-  colour_data[progress + 1] = colour.green;
-  colour_data[progress + 2] = colour.blue;
+  for idx in range(0, std::cmp::min(colour::CHANNELS, COLOUR_WIDTH)) {
+    colour_data[progress + idx] = colour[idx];
+  }
 
-  progress + 4
+  progress + COLOUR_WIDTH
 }
 
 fn load_scene_or_fail(filename: &Path) -> scene::Scene {

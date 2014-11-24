@@ -13,6 +13,7 @@ macro_rules! colour(
 
 pub const BLACK: Colour = colour!();
 pub const WHITE: Colour = colour!(1.0 1.0 1.0);
+pub const CHANNELS: uint = 3;
 
 // Each channel is intended to be in [0.0,1.0]. Call colour_clamp to enforce this
 // 32-bit floats are used for direct compatibility with GLfloat
@@ -71,6 +72,16 @@ impl Mul<Colour, Colour> for Colour {
 impl Add<Colour, Colour> for Colour {
   fn add(&self, rhs: &Colour) -> Colour {
     self.combine(rhs, |a, b| a + b)
+  }
+}
+
+impl Index<uint, f32> for Colour {
+  fn index<'a>(&'a self, _idx: &uint) -> &'a f32 {
+    assert!(*_idx < CHANNELS);
+    match *_idx {
+      0 => &self.red, 1 => &self.green, 2 => &self.blue,
+      _ => panic!("Index {} out of bounds", _idx)
+    }
   }
 }
 

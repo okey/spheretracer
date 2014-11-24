@@ -37,7 +37,9 @@ pub struct Scene {
 
 /* Macros */
 macro_rules! material(
-    () => { Material { diffuse: colour!(), mirror: colour!(), phong: colour!(), phong_n: 1 } };
+    () => { Material { diffuse: colour!(1.0 1.0 1.0),
+                       mirror: colour!(),
+                       phong: colour!(1.0 1.0 1.0), phong_n: 10 } };
 )
 
 macro_rules! sphere(
