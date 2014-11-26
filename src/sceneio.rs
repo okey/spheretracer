@@ -44,7 +44,9 @@ type ParseResult = Result<Scene, ParseError>;
 impl FromError<IoError> for ParseError {
   fn from_error(e: IoError) -> ParseError {
     match e {
-      _ => ParseError { kind: FileOperationFailed, desc: String::from_str(e.desc), line: NoLine },
+      _ => ParseError { kind: ParseErrorKind::FileOperationFailed,
+                        desc: String::from_str(e.desc),
+                        line: LineNumber::NoLine },
     }
   }
 }
@@ -52,7 +54,7 @@ impl FromError<IoError> for ParseError {
 impl fmt::Show for ParseError {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     match self.kind {
-      FileOperationFailed => write!(f, "{} : {}", self.kind, self.desc),
+      ParseErrorKind::FileOperationFailed => write!(f, "{} : {}", self.kind, self.desc),
       _ => write!(f, "{} {}: {}", self.kind, self.line, self.desc)
     }
   }
@@ -124,7 +126,9 @@ pub fn read_scene(filename: &Path) -> ParseResult {
                 else { (dslice[0], dslice[0]) },
           2 => (if dslice[0] < MIN_IMG_DIM { MIN_IMG_DIM } else { dslice[0] },
                 if dslice[1] < MIN_IMG_DIM { MIN_IMG_DIM } else { dslice[1] }),
-          _ => return Err(ParseError { kind: InvalidLine, desc: ls.clone(), line: Line(line_num) })
+          _ => return Err(ParseError { kind: ParseErrorKind::InvalidLine,
+                                       desc: ls.clone(),
+                                       line: LineNumber::Line(line_num) })
         }
       },
 
@@ -134,7 +138,9 @@ pub fn read_scene(filename: &Path) -> ParseResult {
 
         scene.background = match vals.len() {
           3 => make_colour(vals.as_slice()),
-          _ => return Err(ParseError { kind: InvalidLine, desc: ls.clone(), line: Line(line_num) })
+          _ => return Err(ParseError { kind: ParseErrorKind::InvalidLine,
+                                       desc: ls.clone(),
+                                       line: LineNumber::Line(line_num) })
         }
       },
 
@@ -144,7 +150,9 @@ pub fn read_scene(filename: &Path) -> ParseResult {
 
         scene.ambient = match vals.len() {
           3 => make_colour(vals.as_slice()),
-          _ => return Err(ParseError { kind: InvalidLine, desc: ls.clone(), line: Line(line_num) })
+          _ => return Err(ParseError { kind: ParseErrorKind::InvalidLine,
+                                       desc: ls.clone(),
+                                       line: LineNumber::Line(line_num) })
         }
       },
 
@@ -163,7 +171,9 @@ pub fn read_scene(filename: &Path) -> ParseResult {
             scene.lights.push(light);
 
           },
-          _ => return Err(ParseError { kind: InvalidLine, desc: ls.clone(), line: Line(line_num) })
+          _ => return Err(ParseError { kind: ParseErrorKind::InvalidLine,
+                                       desc: ls.clone(),
+                                       line: LineNumber::Line(line_num) })
         }
       },
 
@@ -179,11 +189,15 @@ pub fn read_scene(filename: &Path) -> ParseResult {
             if r > 0.0 {
               sphere.radius = r;
             } else {
-              return Err(ParseError { kind: InvalidLine, desc: ls.clone(), line: Line(line_num) })
+              return Err(ParseError { kind: ParseErrorKind::InvalidLine,
+                                      desc: ls.clone(),
+                                      line: LineNumber::Line(line_num) })
             }
             scene.spheres.push(sphere);
           },
-          _ => return Err(ParseError { kind: InvalidLine, desc: ls.clone(), line: Line(line_num) })
+          _ => return Err(ParseError { kind: ParseErrorKind::InvalidLine,
+                                       desc: ls.clone(),
+                                       line: LineNumber::Line(line_num) })
         }
       },
 
@@ -194,21 +208,24 @@ pub fn read_scene(filename: &Path) -> ParseResult {
         let colours: Vec<f32> = tokens[1..10].iter().filter_map(|&s| from_str::<f32>(s)).collect();
         let phong_n =  match from_str::<u8>(tokens[10]) {
           Some(val) => val,
-          _ => return Err(ParseError { kind: InvalidLine, desc: ls.clone(),
-                                       line: Line(line_num) })
+          _ => return Err(ParseError { kind: ParseErrorKind::InvalidLine,
+                                       desc: ls.clone(),
+                                       line: LineNumber::Line(line_num) })
         };
 
         let sphere = match scene.spheres.last_mut() {
           Some(val) => val,
-          _ => return Err(ParseError { kind: UnexpectedLine, desc: ls.clone(),
-                                       line: Line(line_num) })
+          _ => return Err(ParseError { kind: ParseErrorKind::UnexpectedLine,
+                                       desc: ls.clone(),
+                                       line: LineNumber::Line(line_num) })
         };
 
         if colours.len() == 9 {
           sphere.inner = make_material(colours[0..3], colours[3..6], colours[6..9], phong_n);
         } else {
-          return Err(ParseError { kind: InvalidLine, desc: ls.clone(),
-                                  line: Line(line_num) })
+          return Err(ParseError { kind: ParseErrorKind::InvalidLine,
+                                  desc: ls.clone(),
+                                  line: LineNumber::Line(line_num) })
         }
 
       },
@@ -218,21 +235,24 @@ pub fn read_scene(filename: &Path) -> ParseResult {
         let colours: Vec<f32> = tokens[1..10].iter().filter_map(|&s| from_str::<f32>(s)).collect();
         let phong_n =  match from_str::<u8>(tokens[10]) {
           Some(val) => val,
-          _ => return Err(ParseError { kind: InvalidLine, desc: ls.clone(),
-                                       line: Line(line_num) })
+          _ => return Err(ParseError { kind: ParseErrorKind::InvalidLine,
+                                       desc: ls.clone(),
+                                       line: LineNumber::Line(line_num) })
         };
 
         let sphere = match scene.spheres.last_mut() {
           Some(val) => val,
-          _ => return Err(ParseError { kind: UnexpectedLine,desc: ls.clone(),
-                                       line: Line(line_num) })
+          _ => return Err(ParseError { kind: ParseErrorKind::UnexpectedLine,
+                                       desc: ls.clone(),
+                                       line: LineNumber::Line(line_num) })
         };
 
         if colours.len() == 9 {
           sphere.outer = make_material(colours[0..3], colours[3..6], colours[6..9], phong_n);
         } else {
-          return Err(ParseError { kind: InvalidLine, desc: ls.clone(),
-                                  line: Line(line_num) })
+          return Err(ParseError { kind: ParseErrorKind::InvalidLine,
+                                  desc: ls.clone(),
+                                  line: LineNumber::Line(line_num) })
         }
       },
 
@@ -241,8 +261,9 @@ pub fn read_scene(filename: &Path) -> ParseResult {
 
         let sphere = match scene.spheres.last_mut() {
           Some(val) => val,
-          _ => return Err(ParseError { kind: UnexpectedLine, desc: ls.clone(),
-                                       line: Line(line_num) })
+          _ => return Err(ParseError { kind: ParseErrorKind::UnexpectedLine,
+                                       desc: ls.clone(),
+                                       line: LineNumber::Line(line_num) })
         };
 
         if offsets.len() == 3 {
@@ -253,8 +274,9 @@ pub fn read_scene(filename: &Path) -> ParseResult {
           sphere.transform = mat4::multiply(&this_t, &sphere.transform);
           sphere.inverse_t = mat4::multiply(&sphere.inverse_t, &this_i);
         } else {
-          return Err(ParseError { kind: InvalidLine, desc: ls.clone(),
-                                  line: Line(line_num) })
+          return Err(ParseError { kind: ParseErrorKind::InvalidLine,
+                                  desc: ls.clone(),
+                                  line: LineNumber::Line(line_num) })
         }
       },
 
@@ -263,8 +285,9 @@ pub fn read_scene(filename: &Path) -> ParseResult {
 
         let sphere = match scene.spheres.last_mut() {
           Some(val) => val,
-          _ => return Err(ParseError { kind: UnexpectedLine, desc: ls.clone(),
-                                       line: Line(line_num) })
+          _ => return Err(ParseError { kind: ParseErrorKind::UnexpectedLine,
+                                       desc: ls.clone(),
+                                       line: LineNumber::Line(line_num) })
         };
 
         if offsets.len() == 3 {
@@ -275,30 +298,34 @@ pub fn read_scene(filename: &Path) -> ParseResult {
           sphere.transform = mat4::multiply(&this_t, &sphere.transform);
           sphere.inverse_t = mat4::multiply(&sphere.inverse_t, &this_i);
         } else {
-          return Err(ParseError { kind: InvalidLine, desc: ls.clone(),
-                                  line: Line(line_num) })
+          return Err(ParseError { kind: ParseErrorKind::InvalidLine,
+                                  desc: ls.clone(),
+                                  line: LineNumber::Line(line_num) })
         }
       },
 
       "rotate"    if in_object && n == 3  => {
         let sphere = match scene.spheres.last_mut() {
           Some(val) => val,
-          _ => return Err(ParseError { kind: UnexpectedLine, desc: ls.clone(),
-                                       line: Line(line_num) })
+          _ => return Err(ParseError { kind: ParseErrorKind::UnexpectedLine,
+                                       desc: ls.clone(),
+                                       line: LineNumber::Line(line_num) })
         };
 
         let angle_r = match from_str::<u16>(tokens[2]) { // Allow only integer degrees for now
           Some(val) => radians!(val),
-          _ => return Err(ParseError { kind: InvalidLine, desc: ls.clone(),
-                                       line: Line(line_num) })
+          _ => return Err(ParseError { kind: ParseErrorKind::InvalidLine,
+                                       desc: ls.clone(),
+                                       line: LineNumber::Line(line_num) })
         };
 
         let axis = match tokens[1] {
           "X"|"x" => vector!(1.0 0.0 0.0),
           "Y"|"y" => vector!(0.0 1.0 0.0),
           "Z"|"z" => vector!(0.0 0.0 1.0),
-          _ => return Err(ParseError { kind: InvalidLine, desc: ls.clone(),
-                                       line: Line(line_num) })
+          _ => return Err(ParseError { kind: ParseErrorKind::InvalidLine,
+                                       desc: ls.clone(),
+                                       line: LineNumber::Line(line_num) })
         };
 
         let this_t = mat4::get_rotation(&axis, angle_r);
@@ -311,8 +338,9 @@ pub fn read_scene(filename: &Path) -> ParseResult {
       },
 
       _ => {
-        return Err(ParseError { kind: UnexpectedLine, desc: ls.clone(),
-                                line: Line(line_num) })
+        return Err(ParseError { kind: ParseErrorKind::UnexpectedLine,
+                                desc: ls.clone(),
+                                line: LineNumber::Line(line_num) })
       }
     }
 

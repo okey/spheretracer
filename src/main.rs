@@ -11,7 +11,7 @@ use std::{os,mem,ptr};
 use std::path::Path;
 
 use gl::types::*;
-use glfw::Context;
+use glfw::{Context,OpenGlProfileHint,WindowHint};
 
 use vec3::{Vec3,Transform}; // TODO clean up trait usage once UFCS has been implemented in Rust
 
@@ -66,10 +66,10 @@ fn gl_init_and_render(scene: &scene::Scene) {
   let glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
 
   // Select GL profile; this one should be cross-platform
-  glfw.window_hint(glfw::ContextVersion(3, 2));
-  glfw.window_hint(glfw::OpenglForwardCompat(true));
-  glfw.window_hint(glfw::OpenglProfile(glfw::OpenGlCoreProfile));
-  glfw.window_hint(glfw::Resizable(false));
+  glfw.window_hint(WindowHint::ContextVersion(3, 2));
+  glfw.window_hint(WindowHint::OpenglForwardCompat(true));
+  glfw.window_hint(WindowHint::OpenglProfile(OpenGlProfileHint::Core));
+  glfw.window_hint(WindowHint::Resizable(false));
 
   // TODO support optional fullscreen rendering
   let (window, _) = glfw.create_window(wx as u32, wy as u32, "OpenGL", glfw::Windowed)

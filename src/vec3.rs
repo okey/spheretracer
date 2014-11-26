@@ -1,5 +1,6 @@
 #![macro_escape]
 use std::fmt::{Show,Result,Formatter};
+use std::num::Float;
 use mat4;
 
 /* This module is for a three dimensional vector implementation that includes a homogeneous

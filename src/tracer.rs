@@ -1,4 +1,5 @@
-use std::{num,rand,f64};
+use std::{rand,f64};
+use std::num::{Float,FloatMath};
 use mat4;
 use vec3;
 use vec3::{Vec3,DotProduct,Normalise,Transform,AsVector,Apply};
@@ -37,7 +38,7 @@ fn intersect_fixed_sphere(u: &Vec3, v: &Vec3, r: f64) -> TestOpt {
     return None
   }
 
-  let p = (bsq -  ac4).sqrt();
+  let p = (bsq - ac4).sqrt();
   
   let t1 = if b > 0.0 { (-b - p) / (2.0 * a) } else { (-b + p) / (2.0 * a) };
   let t2 = c / (a * t1);
@@ -139,7 +140,7 @@ fn illuminate_hit(scene: &scene::Scene, material: &scene::Material,
 
     let rv = v_hat.dot(&r_hat) * soften_scale;
     if rv > 0.0 {
-      let phong_scale = num::pow(rv, material.phong_n as uint);
+      let phong_scale = rv.powi(material.phong_n as i32);
       let phong_light = light.colour * phong_scale as f32;
       // could also be extracted
       let phong_part  = phong_light * material.phong;
