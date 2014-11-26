@@ -3,19 +3,26 @@ use std::f64 as stdf64;
 
 use vec3::{Vec3,Normalise};
 
+
+// 4x4 Matrix module
+
+// Constants
+
 pub const DIM: uint = 4;
 
-// if I want to add traits for this I need to use a newtype...
+// Types
+
+// If I want to add traits for this I need to use a newtype...
 // and then manually add all the inner type traits...
 // TODO wait for Rust to fix this
 pub type Matrix = [[f64, ..DIM], ..DIM];
 
-/* Private functions */
+// Private functions
 fn zero() -> Matrix {
   [[0.0, ..DIM], ..DIM]
 }
 
-/* Public functions */
+// Public functions
 pub fn identity() -> Matrix {
   [[1.0, 0.0, 0.0, 0.0],
    [0.0, 1.0, 0.0, 0.0],
@@ -56,7 +63,7 @@ pub fn transpose(a: &Matrix) -> Matrix {
   result
 }
 
-pub fn get_translation(v: &Vec3) -> Matrix {
+pub fn new_translation(v: &Vec3) -> Matrix {
   let mut result = identity();
   result[0][3] = v.x;
   result[1][3] = v.y;
@@ -65,7 +72,7 @@ pub fn get_translation(v: &Vec3) -> Matrix {
   result
 }
 
-pub fn get_scale(v: &Vec3) -> Matrix {
+pub fn new_scale(v: &Vec3) -> Matrix {
   let mut result = identity();
   result[0][0] = v.x;
   result[1][1] = v.y;
@@ -74,7 +81,7 @@ pub fn get_scale(v: &Vec3) -> Matrix {
   result
 }
 
-pub fn get_rotation(axis: &Vec3, rads: f64) -> Matrix {
+pub fn new_rotation(axis: &Vec3, rads: f64) -> Matrix {
   let mut result = identity();
 
   let sinr = FloatMath::sin(rads);
@@ -155,7 +162,7 @@ mod test {
   fn mat4_rotate() {
     let v = vector!(1.0 0.0 0.0);
     let r = consts::PI / 2.0;
-    let m = super::get_rotation(&v, r);
+    let m = super::new_rotation(&v, r);
 
     let s = m.iter().flat_map(|x| x.iter()).fold(0.0, |sum, &e| sum + e);
 
@@ -169,7 +176,7 @@ mod test {
   #[test]
   fn mat4_translate() {
     let v = vector!(1.0 2.0 3.0);
-    let m = super::get_translation(&v);
+    let m = super::new_translation(&v);
 
     let s = m.iter().flat_map(|x| x.iter()).fold(0.0, |sum, &e| sum + e);
 
@@ -183,7 +190,7 @@ mod test {
   #[test]
   fn mat4_scale() {
     let v = vector!(1.0 2.0 3.0);
-    let m = super::get_scale(&v);
+    let m = super::new_scale(&v);
 
     let s = m.iter().flat_map(|x| x.iter()).fold(0.0, |sum, &e| sum + e);
 

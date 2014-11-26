@@ -25,12 +25,17 @@ mod tracer;
 
 mod shaders;
 
-/* The number of components expected per value (colour or position) in the data arrays drawn */
+
+// Constants
+
+// The number of components expected per value (colour or position) in the data arrays drawn
 const COLOUR_WIDTH:uint = 4;
 const VERTEX_WIDTH:uint = 2;
 
 
-/* Make an orthographic matrix to transform from NDC to world (scene) space */
+// Functions
+
+// Make an orthographic matrix to transform from NDC to world (scene) space
 fn make_gl_ortho_mat(width: uint, height: uint) -> [GLfloat, ..16] {
   let mut m:[GLfloat, ..16] = [0.0, ..16];
   let w = width as f32;
@@ -213,7 +218,7 @@ fn gl_init_and_render(scene: &scene::Scene) {
   }
 }
 
-/* Trace a position on screen given our progress so far, then update the colour array */
+// Trace a position on screen given our progress so far, then update the colour array
 fn render_step(scene: &scene::Scene, colour_data: &mut [GLfloat], progress: uint,
                wx: uint, wy: uint) -> uint {
   // Some values from this function could be hoisted but the gains from doing so are probably
@@ -298,7 +303,7 @@ fn load_scene_or_fail(filename: &Path) -> scene::Scene {
   scene
 }
 
-#[allow(dead_code)] // to silence test warnings
+#[allow(dead_code)] // to silence unit test compile warnings
 fn main() {
   let args = os::args();
   let print_usage = args.len() != 2u;

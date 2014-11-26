@@ -10,16 +10,15 @@ use scene;
 use scene::{Sphere,Material};
 
 
-/* Core ray tracing routines */
+// Core ray tracing routines
 
 
-/* Types */
+// Types
 type TestOpt = Option<(f64, f64)>;
 type HitS<'a> = (&'a scene::Sphere, f64, Vec3, bool); // REALLY should be a struct at this point
 type HitSOpt<'a> = Option<HitS<'a>>;
 
-
-/* Private functions */
+// Private functions
 fn intersect_fixed_sphere(u: &Vec3, v: &Vec3, r: f64) -> TestOpt {
   let uu = u.dot(u);
   let uv = u.dot(v);
@@ -70,7 +69,7 @@ fn intersect_sphere<'a>(sphere: &'a scene::Sphere,  u: &Vec3, v: &Vec3) -> HitSO
   }
 }
 
-/* Calculate what factor to colour a position by, using rnadom smapling to soften shadows */
+// Calculate what factor to colour a position by, using random sampling to soften shadows 
 fn soft_shadow_scale(scene: &scene::Scene, light: &scene::Light, hit_u: &Vec3) -> f64 {
   const SOFT_SHADOW_SAMPLES: uint = 1;
   const SOFT_SHADOW_COEFF: f64 = 0.05;
@@ -105,12 +104,10 @@ fn soft_shadow_scale(scene: &scene::Scene, light: &scene::Light, hit_u: &Vec3) -
   visible_samples as f64 / SOFT_SHADOW_SAMPLES as f64
 }
 
-/* Illuminate a hit using the Phong illumination model
- *
- * hit_u is the hit position
- * n_hat is the (unit) surface normal at the hit position
- * v_hat is the (unit) vector from the hit position back to the viewpoint
- */
+// Illuminate a hit using the Phong illumination model
+// hit_u is the hit position
+// n_hat is the (unit) surface normal at the hit position
+// v_hat is the (unit) vector from the hit position back to the viewpoint
 fn illuminate_hit(scene: &scene::Scene, material: &scene::Material,
                   hit_u: &Vec3, n_hat: &Vec3, v_hat: &Vec3) -> Colour {
   // Ambient lighting
@@ -151,7 +148,7 @@ fn illuminate_hit(scene: &scene::Scene, material: &scene::Material,
   result_colour
 }
 
-/* Public functions */
+// Public functions
 pub fn trace_ray(scene: &scene::Scene, u: &Vec3, v: &Vec3, depth: uint) -> Colour {
   // Stop mirror ray recursion at a fixed depth
   if depth == 0 { return colour::BLACK; }
@@ -197,7 +194,7 @@ pub fn trace_ray(scene: &scene::Scene, u: &Vec3, v: &Vec3, depth: uint) -> Colou
   return result_colour.clamp();
 }
 
-/* Unit tests */
+// Unit tests
 #[cfg(test)]
 mod test {
   use vec3::Vec3;

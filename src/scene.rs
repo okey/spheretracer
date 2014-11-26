@@ -1,11 +1,12 @@
 #![macro_escape]
 use std::fmt;
 
-use colour::{Colour,Clamp};
+use colour;
+use colour::Colour;
 use mat4;
 use vec3::Vec3;
 
-/* Types */
+// Types
 pub struct Light {
     pub position: Vec3,
     pub colour: Colour
@@ -35,7 +36,7 @@ pub struct Scene {
     pub spheres: Vec<Sphere>
 }
 
-/* Macros */
+// Macros
 macro_rules! material(
     () => { Material { diffuse: colour!(1.0 1.0 1.0),
                        mirror: colour!(),
@@ -49,18 +50,16 @@ macro_rules! sphere(
     };
 )
 
-/* Public functions */
-pub fn make_colour(v: &[f32]) -> Colour { // what about using a macro for consistency?
-  assert!(v.len() == 3);
-  let c = colour!(v);
-  c.clamp()
+// Public functions
+pub fn new_material(d: &[f32], m: &[f32], p: &[f32], n: u8) -> Material {
+    Material { diffuse: colour::from_slice(d),
+               mirror: colour::from_slice(m),
+               phong: colour::from_slice(p),
+               phong_n: n,
+    }
 }
 
-pub fn make_material(d: &[f32], m: &[f32], p: &[f32], n: u8) -> Material {
-    Material { diffuse: make_colour(d), mirror: make_colour(m), phong: make_colour(p), phong_n: n }
-}
-
-/* Standard trait implementations */
+// Standard trait implementations
 impl fmt::Show for Light {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "\nposition {}, colour {}", self.position, self.colour)

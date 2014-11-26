@@ -3,9 +3,8 @@ use std::fmt::{Show,Result,Formatter};
 use std::num::Float;
 use mat4;
 
-/* This module is for a three dimensional vector implementation that includes a homogeneous
- * coordinate for use with transforms.
- */
+// This module is for a three dimensional vector implementation that includes a homogeneous
+// coordinate for use with transforms.
 
 // Vec3 could be an array type... but then I can't implement traits without either containing it
 // or using newtype. The former is ugly and the latter is tedious because
@@ -18,7 +17,7 @@ pub struct Vec3 {
   pub w: f64
 }
 
-/* Construction macros */
+// Construction macros
 macro_rules! vector_h(
   ($x:expr $y:expr $z:expr $w:expr) => { Vec3 { x: $x, y: $y, z: $z, w: $w } };
   ($a:expr $w:expr) => { Vec3 { x: $a[0], y: $a[1], z: $a[2], w: $w } };
@@ -37,13 +36,12 @@ macro_rules! point(
   () => { vector_h!(0f64 0f64 0f64 1f64) };
 )
 
-/* Public functions */
+// Public functions
 pub fn parametric_position(u: &Vec3, v: &Vec3, t: f64) -> Vec3{
   *u + (*v * t)
 }
 
-
-/* Standard trait implementations */
+// Standard trait implementations
 impl Show for Vec3 {
   fn fmt(&self, f: &mut Formatter) -> Result {
     write!(f, "(x:{}, y:{}, z:{}, w:{})", self.x, self.y, self.z, self.w)
@@ -89,7 +87,7 @@ impl Mul<f64, Vec3> for Vec3 {
   }
 }
 
-/* Custom traits */
+// Custom traits
 pub trait Apply {
   fn apply(&self, f: |f64| -> f64) -> Self;
 }
@@ -128,7 +126,7 @@ pub trait AsPoint {
   fn as_point(&self) -> Self;
 }
 
-/* Custom trait implementations */
+// Custom trait implementations
 impl Apply for Vec3 {
   fn apply(&self, f: |f64| -> f64) -> Vec3 {
     Vec3 { x: f(self.x), y: f(self.y), z: f(self.z), w: self.w }
@@ -197,7 +195,7 @@ impl AsPoint for Vec3 {
   }
 }
 
-/* Unit tests */
+// Unit tests
 #[cfg(test)]
 mod test {
   use super::*;
@@ -265,9 +263,9 @@ mod test {
     let a = point!(1.0 2.0 3.0);
     let b = vector!(1.0 2.0 3.0);
 
-    let m = mat4::get_scale(&vector!(3.0 3.0 3.0));
-    let n = mat4::get_translation(&vector!(3.0 3.0 3.0));
-    let o = mat4::get_rotation(&vector!(1.0 0.0 0.0), consts::PI / 2.0);
+    let m = mat4::new_scale(&vector!(3.0 3.0 3.0));
+    let n = mat4::new_translation(&vector!(3.0 3.0 3.0));
+    let o = mat4::new_rotation(&vector!(1.0 0.0 0.0), consts::PI / 2.0);
 
     let c = a.transform(&o).transform(&n).transform(&m);
     let d = b.transform(&o).transform(&m);

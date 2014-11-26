@@ -4,7 +4,7 @@ use gl::types::*;
 use std::ptr;
 use std::str;
 
-/* GL program and shader compilation module */
+// GL program and shader compilation module
 
 // Vertex shader source
 pub static VS_SRC: &'static str =
@@ -28,7 +28,7 @@ out_colour = fragment_colour;\n\
 }";
 
 
-/* Compile a shader and panic! if something goes wrong */
+// Compile a shader and panic! if something goes wrong
 pub fn compile_shader(src: &str, ty: GLenum) -> GLuint {
   let shader;
   unsafe {
@@ -51,7 +51,7 @@ pub fn compile_shader(src: &str, ty: GLenum) -> GLuint {
   shader
 }
 
-/* Link the program and panic! if something goes wrong */
+// Link the program and panic! if something goes wrong
 pub fn link_program(vs: GLuint, fs: GLuint) -> GLuint {
   unsafe {
     let program = gl::CreateProgram();

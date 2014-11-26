@@ -1,6 +1,21 @@
 #![macro_escape]
 use std::fmt;
 
+
+// Colour module - RGB [0.0,1.0]
+
+// Types
+// Each channel is intended to be in [0.0,1.0]. Call colour_clamp to enforce this.
+// 32-bit floats are used for direct compatibility with GLfloat
+#[deriving(PartialEq)]
+pub struct Colour {
+    pub red: f32,
+    pub green: f32,
+    pub blue: f32
+    // no alpha for now
+}
+
+// Macros
 macro_rules! colour(
   ($r:expr $g:expr $b:expr) => { Colour { red:   $r,
                                           green: $g,
@@ -11,21 +26,21 @@ macro_rules! colour(
   () => { Colour { red: 0.0, green: 0.0, blue: 0.0 } };
 )
 
+// Constants
 pub const BLACK: Colour = colour!();
 pub const WHITE: Colour = colour!(1.0 1.0 1.0);
 pub const CHANNELS: uint = 3;
 
-// Each channel is intended to be in [0.0,1.0]. Call colour_clamp to enforce this
-// 32-bit floats are used for direct compatibility with GLfloat
-#[deriving(PartialEq)]
-pub struct Colour {
-    pub red: f32,
-    pub green: f32,
-    pub blue: f32
-    // no alpha for now
+
+// Public functions
+pub fn from_slice(v: &[f32]) -> Colour { // what about using a macro for consistency?
+  assert!(v.len() == 3);
+  let c = colour!(v);
+  c.clamp()
 }
 
-/* Custom traits and their implementations */
+
+// Custom traits and their implementations
 trait Apply {
   fn apply(&self, f: |f32| -> f32) -> Self;
 }
@@ -56,7 +71,7 @@ impl Clamp for Colour {
   }
 }
 
-/* Standard trait implementations */
+// Standard trait implementations
 impl Mul<f32, Colour> for Colour {
   fn mul(&self, rhs: &f32) -> Colour {
     self.apply(|c| c * *rhs)
@@ -94,7 +109,7 @@ impl fmt::Show for Colour {
     }
 }
 
-/* Unit tests */
+// Unit tests
 #[cfg(test)]
 mod test {
   
