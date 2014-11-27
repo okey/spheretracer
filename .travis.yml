@@ -4,4 +4,5 @@ env:
   global: LD_LIBRARY_PATH: /usr/local/lib
 
 before_install: sudo apt-get update
+
 install: sudo apt-get install libXxf86vm-dev
