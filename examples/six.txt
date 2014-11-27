@@ -1,0 +1,33 @@
+###
+# Perspective test file
+
+imagesize 800 600
+background 0.2 0.4 0.6
+ambient 0.2 0.2 0.2
+
+light  0.0 2.0 1.0   1.0 1.0 1.0
+
+
+sphere 0.4
+outer 0.8 0.4 0.2   0.0 0.0 0.0   0.0 0.0 0.0  10
+translate -1.5 0 -1
+
+sphere 0.4
+outer 0.8 0.4 0.2   0.0 0.0 0.0   0.6 0.4 0.2  10
+translate -1.5 0 -2
+
+sphere 0.4
+outer 0.8 0.4 0.2   0.0 0.0 0.0   0.6 0.4 0.2  50
+translate -1.5 0 -3
+
+sphere 0.4
+outer 0.8 0.4 0.2   0.0 0.0 0.0   0.6 0.4 0.2  5
+translate 1.5 0 -1
+
+sphere 0.4
+outer 0.8 0.4 0.2   0.0 0.0 0.0   0.6 0.4 0.2  10
+translate 1.5 0 -2
+
+sphere 0.4
+outer 0.8 0.4 0.2   0.0 0.0 0.0   0.0 0.0 0.0  10
+translate 1.5 0 -3

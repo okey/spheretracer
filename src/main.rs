@@ -234,7 +234,7 @@ fn render_step(scene: &scene::Scene, colour_data: &mut [GLfloat], progress: uint
   // translate by w/2 and h/2 and then scale back to plane of -1,-1 to 1,1 
   // to transform from my screen space (RH system, origin in bottom left, w * h size
 
-  const SSAA_SAMPLES: uint = 1;
+  const SSAA_SAMPLES: uint = 3;
   assert!(SSAA_SAMPLES > 0 && SSAA_SAMPLES % 2 == 1); // must be a +ve odd integer
   const SSAA_SAMPLES_SQ: f32 = SSAA_SAMPLES as f32 * SSAA_SAMPLES as f32;
   

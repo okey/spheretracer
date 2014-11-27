@@ -71,7 +71,7 @@ fn intersect_sphere<'a>(sphere: &'a scene::Sphere,  u: &Vec3, v: &Vec3) -> HitSO
 
 // Calculate what factor to colour a position by, using random sampling to soften shadows 
 fn soft_shadow_scale(scene: &scene::Scene, light: &scene::Light, hit_u: &Vec3) -> f64 {
-  const SOFT_SHADOW_SAMPLES: uint = 1;
+  const SOFT_SHADOW_SAMPLES: uint = 20;
   const SOFT_SHADOW_COEFF: f64 = 0.05;
   assert!(SOFT_SHADOW_SAMPLES > 0);
   

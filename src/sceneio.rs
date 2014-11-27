@@ -265,8 +265,6 @@ pub fn read_scene(filename: &Path) -> ParseResult<Scene> {
 }
 
 // Private functions
-
-
 fn n_words_to_or_fail<T: FromStr>(items: &Vec<&str>, start: uint,
                                     min_length: uint, max_length: uint, expect_end: bool,
                                     line: &String, line_num: uint) -> ParseResult<Vec<T>> {

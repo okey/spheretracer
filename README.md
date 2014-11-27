@@ -10,6 +10,8 @@ It supports supersampled antialiasing, random light sampling (soft shadows), and
 - Run it with `cargo run path/to/scenefile.txt`
 
 ### Scene files
+Take a look at some [examples](examples), or read on.
+
 ```
 # Example scene file - this is a comment
 # The basic format per-line: keyword x y z

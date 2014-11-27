@@ -1,0 +1,18 @@
+###
+# A small sphere casts a shadow onto a large sphere
+# Somewhat pathological when AA and soft shadows are on.
+
+imagesize 800 600
+ambient 0.2 0.2 0.2 # grey
+
+# A single white light, located on the viewplane and up a little
+light 0.0 0.5 1.0   1.0 1.0 1.0 # you may use multiple spaces between parameters for readability
+
+# A small white sphere in the centre of the scene
+sphere 0.4
+outer 0.9 0.9 0.9   0.0 0.0 0.0   0.5 0.5 0.5 50
+
+# A large grey sphere, moved back from the viewplane
+sphere 100
+outer 0.2 0.2 0.2   0.0 0.0 0.0   1.0 1.0 1.0 50
+translate 0 0 -104
