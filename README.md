@@ -51,9 +51,7 @@ outer 0.2 0.2 0.2   0.0 0.0 0.0   1.0 1.0 1.0  50
 translate 0 0 -104
 ```
 
-Running the raytracer on this will produce:
-
-![a nice render](shadow.png)
+Running the raytracer on this will produce: ![a nice render](examples/shadow.png)
 
 ### TODO
 
