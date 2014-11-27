@@ -9,4 +9,7 @@ git = "https://github.com/bjz/gl-rs"
 
 [dependencies.glfw]
 git = "https://github.com/bjz/glfw-rs"
+
+[target.x86_64-pc-windows-gnu.dependencies.glfw]
+git = "https://github.com/bjz/glfw-rs"
 default-features = false
