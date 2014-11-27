@@ -4,6 +4,11 @@
 #![feature(globs)]
 #![feature(if_let)]
 
+#[phase(plugin)]
+extern crate regex_macros;
+
+extern crate regex;
+extern crate core;
 extern crate gl;
 extern crate glfw;
 
@@ -312,7 +317,7 @@ fn main() {
     println!("Usage:\n\t {} scene_file.txt", args[0]);
     return
   }
-  
+
   let filename = Path::new(args[1].clone());
   let scene = load_scene_or_fail(&filename);
 

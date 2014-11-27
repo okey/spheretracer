@@ -55,6 +55,7 @@ translate 0 0 -104
 - [ ] Transparent objects
 - [ ] Rewrite sceneio.rs
    - [ ] Allow AA and soft shadows to be specified in the scene file
+- [ ] Rewrite vector and colour macros
 - [ ] Implement space division to avoid pathlogical cases, esp. with AA and soft shadows
 - [ ] Support writing to image files
 - [ ] Better OpenGL rendering
