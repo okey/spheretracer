@@ -26,14 +26,13 @@ ambient 0.2 0.2 0.2 # this is the ambient lighting
 # A specify a light with light x y z r g b 
 light  0.0 0.5 1.0   1.0 1.0 1.0
 
-
-# A sphere of radius 0.4 psoitioned at the origin
+# A sphere of radius 0.4 positioned at the origin
 sphere 0.4
 # It has an outer material property specified with the following syntax
-# outer diffuse-colour-rgb mirror-colour-rgb highlight-colour-rgb highlight-strength
+# outer diffuse-colour-rgb mirror-colour-rgb highlight-colour-rgb specular-coefficient
 outer 0.9 0.9 0.9   0.0 0.0 0.0   0.5 0.5 0.5  50
 
-# You can also specify an inner material in the same way:
+# You can also specify an inner material in the same way
 # inner 0.1 0.1 0.1 0.0 0.0 0.0 0.5 0.5 0.5 10
 
 # Move the sphere with translate x y z
@@ -51,6 +50,10 @@ sphere 100
 outer 0.2 0.2 0.2   0.0 0.0 0.0   1.0 1.0 1.0  50
 translate 0 0 -104
 ```
+
+Running the raytracer on this will produce:
+
+![a nice render](shadow.png)
 
 ### TODO
 
