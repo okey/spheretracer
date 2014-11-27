@@ -1,6 +1,6 @@
 Spheretracer
 ============
-[![Build Status](https://travis-ci.org/okey/spheretracer.svg?branch=master)](https://travis-ci.org/okey/spheretracer)
+[Travis disabled until the GLFW dependency builds properly with it]
 
 Spheretracer is a basic ray tracer I wrote to learn Rust.
 Spheres are currently the only available primitive type, and illumination uses the Phong model.
