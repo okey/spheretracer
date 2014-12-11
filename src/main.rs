@@ -2,7 +2,6 @@
 #![feature(macro_rules)]
 #![feature(phase)]
 #![feature(globs)]
-#![feature(if_let)]
 
 #[phase(plugin)]
 extern crate regex_macros;
