@@ -4,6 +4,9 @@ name = "spheretracer"
 version = "0.0.1"
 authors = ["Oscar <nova.invictus@gmail.com>"]
 
+[dependencies.bmp]
+git = "https://github.com/sondrele/rust-bmp.git"
+
 [dependencies.gl]
 git = "https://github.com/bjz/gl-rs"
 

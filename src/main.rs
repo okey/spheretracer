@@ -11,6 +11,7 @@ extern crate regex;
 extern crate core;
 extern crate gl;
 extern crate glfw;
+extern crate bmp;
 
 use std::{os,mem,ptr};
 use std::path::Path;
@@ -184,7 +185,7 @@ fn gl_init_and_render(scene: &scene::Scene) {
 
   // Do the raytracing in chunks so we can watch it happen on screen
   let mut chunk = 0;
-  let chunk_size = real_wy * 4;
+  let chunk_size = real_wy * 4; // This is fairly arbitrary
   let max_chunk = colour_data.len() / chunk_size;
   
   let mut render_progress = 0;
@@ -193,10 +194,30 @@ fn gl_init_and_render(scene: &scene::Scene) {
   while !window.should_close() {
     glfw.poll_events();
     
-    while chunk <= max_chunk && render_progress < chunk_size * chunk {
-      render_progress = render_step(scene, colour_data, render_progress, real_wx, real_wy);
+    if render_progress < colour_data.len() {
+      // A bit clunky, but incrementing chunk forever would be dangerous
+      while chunk <= max_chunk && render_progress < chunk_size * chunk {
+        render_progress = render_step(scene, colour_data, render_progress, real_wx, real_wy);
+      }
+      chunk += 1;
+    } else if render_progress == colour_data.len() {
+      // If done, write the image
+      let mut img = bmp::Image::new(real_wx, real_wy);
+      
+      for idx in std::iter::count(0u, COLOUR_WIDTH).take(colour_data.len() / COLOUR_WIDTH) {
+        let row =  idx / (COLOUR_WIDTH * real_wy);
+        let col = (idx % (COLOUR_WIDTH * real_wy)) / COLOUR_WIDTH;
+
+        img.set_pixel(row, col, bmp::Pixel{r: (colour_data[idx] * 255.0) as u8,
+                                         g: (colour_data[idx + 1] * 255.0) as u8,
+                                         b: (colour_data[idx + 2] * 255.0) as u8});
+      }
+      img.save("render.bmp");
+      println!("Output image written to file");
+      render_progress += 1; // Don't write the same image over and over
     }
-    chunk += 1;
+
+    
     
     // cbo is still bound from setup
     unsafe { 

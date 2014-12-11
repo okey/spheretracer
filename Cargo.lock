@@ -2,9 +2,15 @@
 name = "spheretracer"
 version = "0.0.1"
 dependencies = [
+ "bmp 0.0.2 (git+https://github.com/sondrele/rust-bmp.git)",
  "gl 0.0.1 (git+https://github.com/bjz/gl-rs)",
  "glfw 0.0.1 (git+https://github.com/bjz/glfw-rs)",
 ]
+
+[[package]]
+name = "bmp"
+version = "0.0.2"
+source = "git+https://github.com/sondrele/rust-bmp.git#4d942d3e8652fc28776759988a475eee84115d9f"
 
 [[package]]
 name = "gl"
