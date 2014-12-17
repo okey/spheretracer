@@ -70,8 +70,8 @@ fn make_gl_ortho_mat(width: uint, height: uint) -> [GLfloat, ..16] {
 }
 
 fn gl_init_and_render(scene: &scene::Scene) {
-  let wx = scene.image_size.val0() as uint;
-  let wy = scene.image_size.val1() as uint;
+  let wx = scene.image_size.0 as uint;
+  let wy = scene.image_size.1 as uint;
 
   let glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
 

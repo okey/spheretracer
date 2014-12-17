@@ -7,7 +7,7 @@ use std::fmt;
 // Types
 // Each channel is intended to be in [0.0,1.0]. Call colour_clamp to enforce this.
 // 32-bit floats are used for direct compatibility with GLfloat
-#[deriving(PartialEq)]
+#[deriving(PartialEq,Copy)]
 pub struct Colour {
     pub red: f32,
     pub green: f32,
@@ -73,20 +73,20 @@ impl Clamp for Colour {
 
 // Standard trait implementations
 impl Mul<f32, Colour> for Colour {
-  fn mul(&self, rhs: &f32) -> Colour {
-    self.apply(|c| c * *rhs)
+  fn mul(self, rhs: f32) -> Colour {
+    self.apply(|c| c * rhs)
   }
 }
 
 impl Mul<Colour, Colour> for Colour {
-  fn mul(&self, rhs: &Colour) -> Colour {
-    self.combine(rhs, |a, b| a * b)
+  fn mul(self, rhs: Colour) -> Colour {
+    self.combine(&rhs, |a, b| a * b)
   }
 }
 
 impl Add<Colour, Colour> for Colour {
-  fn add(&self, rhs: &Colour) -> Colour {
-    self.combine(rhs, |a, b| a + b)
+  fn add(self, rhs: Colour) -> Colour {
+    self.combine(&rhs, |a, b| a + b)
   }
 }
 

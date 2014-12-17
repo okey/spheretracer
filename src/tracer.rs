@@ -51,8 +51,8 @@ fn intersect_sphere<'a>(sphere: &'a scene::Sphere,  u: &Vec3, v: &Vec3) -> HitSO
 
   match intersect_fixed_sphere(&uprime, &vprime, sphere.radius) {
     Some(x) => {
-      let t1 = x.val0();
-      let t2 = x.val1();
+      let t1 = x.0;
+      let t2 = x.1;
       
       // Consider the ray to have missed if an intersection is behind the ray's start position
       // Only return the nearest (non -ve) intersection with this object
@@ -91,7 +91,7 @@ fn soft_shadow_scale(scene: &scene::Scene, light: &scene::Light, hit_u: &Vec3) -
     // If this sample is in shadow then do not count it
     let blocked = scene.spheres.iter().any(|s| {
       if let Some(h) = intersect_sphere(s, hit_u, &jit_i_vec) {
-        return h.val1() >= 0.0 && h.val1() <= 1.0
+        return h.1 >= 0.0 && h.1 <= 1.0
       };
       false
     });
@@ -164,14 +164,14 @@ pub fn trace_ray(scene: &scene::Scene, u: &Vec3, v: &Vec3, depth: uint) -> Colou
   
   // Take the closest hit and extract the result
   let max_h = (&sphere!(), f64::MAX_VALUE, vector!(), false);
-  let hit = hits.iter().fold(max_h, |s, h| { if h.val1() < s.val1() { *h } else { s }});
+  let hit = hits.iter().fold(max_h, |s, h| { if h.1 < s.1 { *h } else { s }});
 
-  let sphere = &hit.val0();
-  let material = if hit.val3() { sphere.outer } else { sphere.inner };
+  let sphere = &hit.0;
+  let material = if hit.3 { sphere.outer } else { sphere.inner };
   
   // Find the hit position, surface normal at the hit position, and reverse viewpoint vectors
-  let hit_u = vec3::parametric_position(u, v, hit.val1() * 0.9999);
-  let n_hat = hit.val2().as_vector().transform(&mat4::transpose(&sphere.inverse_t)).normalise();
+  let hit_u = vec3::parametric_position(u, v, hit.1 * 0.9999);
+  let n_hat = hit.2.as_vector().transform(&mat4::transpose(&sphere.inverse_t)).normalise();
   let v_hat = (*u - hit_u).normalise();
 
   // Do illumination using the Phong model

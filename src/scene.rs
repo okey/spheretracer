@@ -12,6 +12,7 @@ pub struct Light {
     pub colour: Colour
 }
 
+#[deriving(Copy)]
 pub struct Material {
     pub diffuse: Colour,
     pub mirror: Colour,

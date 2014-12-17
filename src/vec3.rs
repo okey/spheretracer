@@ -9,7 +9,7 @@ use mat4;
 // Vec3 could be an array type... but then I can't implement traits without either containing it
 // or using newtype. The former is ugly and the latter is tedious because
 // Consider rewrite when newtype stuff gets added or if Rust adds properties
-#[deriving(PartialEq)]
+#[deriving(PartialEq,Copy)]
 pub struct Vec3 {
   pub x: f64,
   pub y: f64,
@@ -58,7 +58,7 @@ impl Index<uint, f64> for Vec3 {
 }
 
 impl Add<Vec3, Vec3> for Vec3 {
-  fn add(&self, rhs: &Vec3) -> Vec3 {
+  fn add(self, rhs: Vec3) -> Vec3 {
     Vec3 { x: self.x + rhs.x,
            y: self.y + rhs.y,
            z: self.z + rhs.z,
@@ -71,7 +71,7 @@ impl Add<Vec3, Vec3> for Vec3 {
 }
 
 impl Sub<Vec3, Vec3> for Vec3 {
-  fn sub(&self, rhs: &Vec3) -> Vec3 {
+  fn sub(self, rhs: Vec3) -> Vec3 {
     Vec3 { x: self.x - rhs.x,
            y: self.y - rhs.y,
            z: self.z - rhs.z,
@@ -81,8 +81,8 @@ impl Sub<Vec3, Vec3> for Vec3 {
 }
 
 impl Mul<f64, Vec3> for Vec3 {
-  fn mul(&self, rhs: &f64) -> Vec3 {
-    let f = *rhs;
+  fn mul(self, rhs: f64) -> Vec3 {
+    let f = rhs;
     Vec3 { x: self.x * f, y: self.y * f, z: self.z * f, w: self.w }
   }
 }
@@ -164,7 +164,7 @@ impl Magnitude for Vec3 {
 
 impl Normalise for Vec3 {
   fn normalise(&self) -> Vec3 {
-    self.mul(&(1.0 / self.magnitude()))
+    self.mul(1.0 / self.magnitude())
   }
 }
 
