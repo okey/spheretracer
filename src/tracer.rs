@@ -203,11 +203,11 @@ mod test {
 
   #[test]
   fn trace_intersect_unit() {
-    let u_centre = point!(0.0 0.0 1.0);
+    let u_centre = point!(0.0, 0.0, 1.0);
     let m1 = -1.0;
-    let v = vector!(0.0 0.0 m1);
-    let u_bottom_left = vector!(m1 m1 m1);
-    let u_top_right = vector!(1.0 1.0 m1);
+    let v = vector!(0.0, 0.0, m1);
+    let u_bottom_left = vector!(m1, m1, m1);
+    let u_top_right = vector!(1.0, 1.0, m1);
 
     assert!(None != super::intersect_fixed_sphere(&u_centre, &v, 1.0));
     assert!(None == super::intersect_fixed_sphere(&u_bottom_left, &v, 1.0));

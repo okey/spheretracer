@@ -136,16 +136,16 @@ mod test {
 
   #[test]
   fn colour_add() {
-    let red = colour!(1.0 0.0 0.0);
-    let blue = colour!(0.0 0.0 1.0);
-    let purple = colour!(1.0 0.0 1.0);
+    let red = colour!(1.0, 0.0, 0.0);
+    let blue = colour!(0.0, 0.0, 1.0);
+    let purple = colour!(1.0, 0.0, 1.0);
 
     assert!(red + blue == purple);
   }
 
   #[test]
   fn colour_mul() {
-    let grey = colour!(0.5 0.5 0.5);
+    let grey = colour!(0.5, 0.5, 0.5);
 
     assert!(grey == WHITE * 0.5);
   }

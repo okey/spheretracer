@@ -157,7 +157,7 @@ mod test {
 
   #[test]
   fn mat4_rotate() {
-    let v = vector!(1.0 0.0 0.0);
+    let v = vector!(1.0, 0.0, 0.0);
     let r = consts::PI / 2.0;
     let m = super::new_rotation(&v, r);
 
@@ -172,7 +172,7 @@ mod test {
 
   #[test]
   fn mat4_translate() {
-    let v = vector!(1.0 2.0 3.0);
+    let v = vector!(1.0, 2.0, 3.0);
     let m = super::new_translation(&v);
 
     let s = m.iter().flat_map(|x| x.iter()).fold(0.0, |sum, &e| sum + e);
@@ -186,7 +186,7 @@ mod test {
 
   #[test]
   fn mat4_scale() {
-    let v = vector!(1.0 2.0 3.0);
+    let v = vector!(1.0, 2.0, 3.0);
     let m = super::new_scale(&v);
 
     let s = m.iter().flat_map(|x| x.iter()).fold(0.0, |sum, &e| sum + e);
