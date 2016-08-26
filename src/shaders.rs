@@ -3,6 +3,7 @@ use gl::types::*;
 
 use std::ptr;
 use std::str;
+use std::ffi::CString;
 
 // GL program and shader compilation module
 
@@ -34,7 +35,8 @@ pub fn compile_shader(src: &str, ty: GLenum) -> GLuint {
   unsafe {
     shader = gl::CreateShader(ty);
 
-    src.with_c_str(|ptr| gl::ShaderSource(shader, 1, &ptr, ptr::null()));
+    let cstr = CString::new(src).unwrap();
+    gl::ShaderSource(shader, 1, &cstr.as_ptr(), ptr::null());
     gl::CompileShader(shader);
 
     let mut status = gl::FALSE as GLint;
@@ -43,7 +45,7 @@ pub fn compile_shader(src: &str, ty: GLenum) -> GLuint {
     if status != (gl::TRUE as GLint) {
       let mut len = 0;
       gl::GetShaderiv(shader, gl::INFO_LOG_LENGTH, &mut len);
-      let mut buf = Vec::from_elem(len as uint - 1, 0u8); // -1 for null terminator
+      let mut buf = vec!(0u8; len as usize - 1); // -1 for null terminator
       gl::GetShaderInfoLog(shader, len, ptr::null_mut(), buf.as_mut_ptr() as *mut GLchar);
       panic!("{}", str::from_utf8(buf.as_slice()).expect("ShaderInfoLog not valid utf8"));
     }
@@ -65,7 +67,7 @@ pub fn link_program(vs: GLuint, fs: GLuint) -> GLuint {
     if status != (gl::TRUE as GLint) {
       let mut len: GLint = 0;
       gl::GetProgramiv(program, gl::INFO_LOG_LENGTH, &mut len);
-      let mut buf = Vec::from_elem(len as uint - 1, 0u8); // -1 for null terminator
+      let mut buf = vec!(0u8; len as usize - 1); // -1 for null terminator
       gl::GetProgramInfoLog(program, len, ptr::null_mut(), buf.as_mut_ptr() as *mut GLchar);
       panic!("{}", str::from_utf8(buf.as_slice()).expect("ProgramInfoLog not valid utf8"));
     }

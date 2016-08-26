@@ -1,6 +1,3 @@
-use std::num::FloatMath;
-use std::f64 as stdf64;
-
 use vec3::{Vec3,Normalise};
 
 
@@ -8,18 +5,18 @@ use vec3::{Vec3,Normalise};
 
 // Constants
 
-pub const DIM: uint = 4;
+pub const DIM: usize = 4;
 
 // Types
 
 // If I want to add traits for this I need to use a newtype...
 // and then manually add all the inner type traits...
 // TODO wait for Rust to fix this
-pub type Matrix = [[f64, ..DIM], ..DIM];
+pub type Matrix = [[f64; DIM]; DIM];
 
 // Private functions
 fn zero() -> Matrix {
-  [[0.0, ..DIM], ..DIM]
+  [[0.0; DIM]; DIM]
 }
 
 // Public functions
@@ -34,18 +31,18 @@ pub fn identity() -> Matrix {
 pub fn matrix_print(a: &Matrix, title: &str) {
   println!("{}", title);
 
-  for row in a.iter() {
-    let str: Vec<String> = row.iter().map(|&v| stdf64::to_str_exact(v, 3u)).collect();
-    println!("{}", str);
+  for row in a.iter() { // what happened to stdf64::to_str_exact(v, 3) ???
+    let str: Vec<String> = row.iter().map(|&v| v.to_string()).collect();
+    println!("{:?}", str);
   }
   println!("");
 }
 
 pub fn multiply(a: &Matrix, b: &Matrix) -> Matrix {
   let mut result = zero();
-  for row in range(0, DIM) {
-    for col in range(0, DIM) {
-      for k in range(0, DIM) {
+  for row in 0.. DIM {
+    for col in 0.. DIM {
+      for k in 0.. DIM {
         result[row][col] += a[row][k] * b[k][col];
       }
     }
@@ -55,8 +52,8 @@ pub fn multiply(a: &Matrix, b: &Matrix) -> Matrix {
 
 pub fn transpose(a: &Matrix) -> Matrix {
   let mut result = zero();
-  for row in range(0, DIM) {
-    for col in range(0, DIM) {
+  for row in 0.. DIM {
+    for col in 0.. DIM {
       result[row][col] = a[col][row];
     }
   }
@@ -84,8 +81,8 @@ pub fn new_scale(v: &Vec3) -> Matrix {
 pub fn new_rotation(axis: &Vec3, rads: f64) -> Matrix {
   let mut result = identity();
 
-  let sinr = FloatMath::sin(rads);
-  let cosr = FloatMath::cos(rads);
+  let sinr = rads.sin();
+  let cosr = rads.cos();
   let u = axis.normalise();
 
   // TODO sq macro if there isn't already one
@@ -120,7 +117,7 @@ mod test {
   use super::*;
   use std::f64::consts;
   use vec3::Vec3;
-  
+
   #[test]
   fn mat4_zero() {
     let m = super::zero();
@@ -133,10 +130,10 @@ mod test {
     let m = super::identity();
     let s = m.iter().flat_map(|x| x.iter()).fold(0.0, |sum, &e| sum + e);
 
-    for x in range(0, DIM) {
+    for x in 0.. DIM {
       assert!(m[x][x] == 1.0);
     }
-    
+
     assert!(s == DIM as f64);
   }
 
@@ -150,14 +147,14 @@ mod test {
     let s = n.iter().flat_map(|x| x.iter()).fold(0.0, |sum, &e| sum + e);
 
 
-    for x in range(0, DIM) {
+    for x in 0.. DIM {
       assert!(n[x][x] == 1.0);
     }
     assert!(n[DIM - 1][0] == 4.0);
     assert!(n[0][DIM - 1] == 5.0);
     assert!(s == DIM as f64 + 9.0);
   }
-  
+
   #[test]
   fn mat4_rotate() {
     let v = vector!(1.0 0.0 0.0);
@@ -172,7 +169,7 @@ mod test {
     assert!(m[3][3] == 1.0);
     assert!(s == 2.0);
   }
-  
+
   #[test]
   fn mat4_translate() {
     let v = vector!(1.0 2.0 3.0);
@@ -180,7 +177,7 @@ mod test {
 
     let s = m.iter().flat_map(|x| x.iter()).fold(0.0, |sum, &e| sum + e);
 
-    for x in range(0, DIM - 1) {
+    for x in 0.. DIM - 1 {
       assert!(m[x][DIM - 1] == v[x]);
     }
     assert!(m[DIM - 1][DIM - 1] == 1.0);
@@ -194,7 +191,7 @@ mod test {
 
     let s = m.iter().flat_map(|x| x.iter()).fold(0.0, |sum, &e| sum + e);
 
-    for x in range(0, DIM - 1) {
+    for x in 0.. DIM - 1 {
       assert!(m[x][x] == v[x]);
     }
     assert!(m[DIM - 1][DIM - 1] == 1.0);
@@ -210,9 +207,9 @@ mod test {
              [4.0, 3.0, 2.0, 1.0]];
 
     let o = super::multiply(&n, &m);
-    
-    for r in range(0, DIM) {
-      for c in range(0, DIM) {
+
+    for r in 0.. DIM {
+      for c in 0.. DIM {
         assert!(o[r][c] == n[r][c]);
       }
     }

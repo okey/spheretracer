@@ -1,5 +1,5 @@
-use std::{rand,f64};
-use std::num::{Float,FloatMath};
+use rand;
+use std::f64;
 use mat4;
 use vec3;
 use vec3::{Vec3,DotProduct,Normalise,Transform,AsVector,Apply};
@@ -23,14 +23,14 @@ fn intersect_fixed_sphere(u: &Vec3, v: &Vec3, r: f64) -> TestOpt {
   let uu = u.dot(u);
   let uv = u.dot(v);
   let vv = v.dot(v);
-  
+
   let a = vv;
   let b = 2.0 * uv;
   let c = uu - r * r;
 
   let ac4 = a * c * 4.0;
   let bsq =  b * b;
-  
+
   if bsq <= ac4 {
     // < no real roots; miss
     // = 1  real root ; ray is tangent to sphere; treat as miss
@@ -38,10 +38,10 @@ fn intersect_fixed_sphere(u: &Vec3, v: &Vec3, r: f64) -> TestOpt {
   }
 
   let p = (bsq - ac4).sqrt();
-  
+
   let t1 = if b > 0.0 { (-b - p) / (2.0 * a) } else { (-b + p) / (2.0 * a) };
   let t2 = c / (a * t1);
-  
+
   Some((t1, t2))
 }
 
@@ -53,7 +53,7 @@ fn intersect_sphere<'a>(sphere: &'a scene::Sphere,  u: &Vec3, v: &Vec3) -> HitSO
     Some(x) => {
       let t1 = x.0;
       let t2 = x.1;
-      
+
       // Consider the ray to have missed if an intersection is behind the ray's start position
       // Only return the nearest (non -ve) intersection with this object
       let (t, outside) = if t1 >= 0.0 && t2 >= 0.0 { (t1.min(t2), true) }
@@ -62,32 +62,34 @@ fn intersect_sphere<'a>(sphere: &'a scene::Sphere,  u: &Vec3, v: &Vec3) -> HitSO
       else { return None };
 
       let h = vec3::parametric_position(&uprime, &vprime, t);
-      
+
       Some((sphere, t, h, outside))
     },
     _ => None
   }
 }
 
-// Calculate what factor to colour a position by, using random sampling to soften shadows 
+// Calculate what factor to colour a position by, using random sampling to soften shadows
 fn soft_shadow_scale(scene: &scene::Scene, light: &scene::Light, hit_u: &Vec3) -> f64 {
-  const SOFT_SHADOW_SAMPLES: uint = 20;
+  const SOFT_SHADOW_SAMPLES: usize = 20;
   const SOFT_SHADOW_COEFF: f64 = 0.05;
   assert!(SOFT_SHADOW_SAMPLES > 0);
-  
+
   let rng = rand::random::<f64>; // TODO investigate performance of doing this here
 
   // Jitter the light position by +/-0.5 * coeff in each axis to model lights with area
-  let light_i_fn = if SOFT_SHADOW_SAMPLES == 1 {
-    |p: &Vec3| *p - *hit_u // No jitter if we are only taking one sample (i.e. no soft shadows)
-  } else {
-    |p: &Vec3| p.apply(|c: f64| c + (rng() - 0.5) * SOFT_SHADOW_COEFF) - *hit_u
-  };
-  
-  // Random sampling. Maybe a different distribution would look better?      
-  let visible_samples = range(0, SOFT_SHADOW_SAMPLES).filter_map(|_| {
+  // TODO why did use closures for this???
+  let light_i_fn =
+    |p: &Vec3| if SOFT_SHADOW_SAMPLES == 1 {
+      *p - *hit_u // No jitter if we are only taking one sample (i.e. no soft shadows)
+    } else {
+      p.apply(|c: f64| c + (rng() - 0.5) * SOFT_SHADOW_COEFF) - *hit_u
+    };
+
+  // Random sampling. Maybe a different distribution would look better?
+  let visible_samples = (0.. SOFT_SHADOW_SAMPLES).filter_map(|_| {
     let jit_i_vec = light_i_fn(&light.position);
-    
+
     // If this sample is in shadow then do not count it
     let blocked = scene.spheres.iter().any(|s| {
       if let Some(h) = intersect_sphere(s, hit_u, &jit_i_vec) {
@@ -95,11 +97,11 @@ fn soft_shadow_scale(scene: &scene::Scene, light: &scene::Light, hit_u: &Vec3) -
       };
       false
     });
-    
-    if !blocked { return Some::<uint>(1) }
+
+    if !blocked { return Some::<usize>(1) }
     None
   }).count();
-  
+
   // Return the proprotion by which we should colour the hit position
   visible_samples as f64 / SOFT_SHADOW_SAMPLES as f64
 }
@@ -118,13 +120,13 @@ fn illuminate_hit(scene: &scene::Scene, material: &scene::Material,
   for light in scene.lights.iter() {
     // i_hat is a unit vector in direction of light source
     let i_hat = (light.position - *hit_u).normalise();
-    
-    let soften_scale = soft_shadow_scale(scene, light, hit_u); 
+
+    let soften_scale = soft_shadow_scale(scene, light, hit_u);
     if soften_scale == 0.0 { continue; } // in shadow
 
     // Diffuse (Lambertian) component
     let ni = n_hat.dot(&i_hat) * soften_scale;
-    if ni > 0.0 { 
+    if ni > 0.0 {
       let diff_light = light.colour * ni as f32;
       let diff_part = diff_light * material.diffuse;
       result_colour = result_colour + diff_part;
@@ -149,7 +151,7 @@ fn illuminate_hit(scene: &scene::Scene, material: &scene::Material,
 }
 
 // Public functions
-pub fn trace_ray(scene: &scene::Scene, u: &Vec3, v: &Vec3, depth: uint) -> Colour {
+pub fn trace_ray(scene: &scene::Scene, u: &Vec3, v: &Vec3, depth: usize) -> Colour {
   // Stop mirror ray recursion at a fixed depth
   if depth == 0 { return colour::BLACK; }
 
@@ -157,18 +159,18 @@ pub fn trace_ray(scene: &scene::Scene, u: &Vec3, v: &Vec3, depth: uint) -> Colou
   let hits = scene.spheres.iter()
     .filter_map(|s| intersect_sphere(s, u, v))
     .collect::<Vec<HitS>>();
-  
+
   // Trace the background colour in the abscence of any objects
   if hits.len() == 0 { return scene.background; }
-  
-  
+
+
   // Take the closest hit and extract the result
-  let max_h = (&sphere!(), f64::MAX_VALUE, vector!(), false);
+  let max_h = (&sphere!(), f64::MAX, vector!(), false);
   let hit = hits.iter().fold(max_h, |s, h| { if h.1 < s.1 { *h } else { s }});
 
   let sphere = &hit.0;
   let material = if hit.3 { sphere.outer } else { sphere.inner };
-  
+
   // Find the hit position, surface normal at the hit position, and reverse viewpoint vectors
   let hit_u = vec3::parametric_position(u, v, hit.1 * 0.9999);
   let n_hat = hit.2.as_vector().transform(&mat4::transpose(&sphere.inverse_t)).normalise();
@@ -176,7 +178,7 @@ pub fn trace_ray(scene: &scene::Scene, u: &Vec3, v: &Vec3, depth: uint) -> Colou
 
   // Do illumination using the Phong model
   let phong_colour = illuminate_hit(scene, &material, &hit_u, &n_hat, &v_hat);
-  
+
   // Trace any reflections
   let mirror_colour = if colour::BLACK != material.mirror {
     let reflected_v = (n_hat * (2.0 * v_hat.dot(&n_hat)) - v_hat).normalise();
@@ -198,7 +200,7 @@ pub fn trace_ray(scene: &scene::Scene, u: &Vec3, v: &Vec3, depth: uint) -> Colou
 #[cfg(test)]
 mod test {
   use vec3::Vec3;
-  
+
   #[test]
   fn trace_intersect_unit() {
     let u_centre = point!(0.0 0.0 1.0);
