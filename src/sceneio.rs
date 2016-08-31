@@ -7,6 +7,7 @@ use std::error::Error as StdError;
 use std::path::Path;
 use std::{fmt,cmp};
 use core::str::FromStr;
+use regex::Regex;
 
 use mat4;
 use vec3::{AsDivisorOf,Vec3}; // TODO Clean up trait usage when UFCS is implemented in Rust
@@ -78,7 +79,9 @@ pub fn read_scene(filename: &Path) -> ParseResult<Scene> {
 
   let file = BufReader::new(try!(File::open(filename)));
   let mut line_num = 0 as usize;
-  let space_tab_re = regex!(r"[ \t]+");
+  lazy_static! {
+    static ref SPACE_TAB_RE: Regex = Regex::new(r"[ \t]+").unwrap();
+  }
 
   // Default scene
   let mut scene = Scene {
@@ -97,7 +100,7 @@ pub fn read_scene(filename: &Path) -> ParseResult<Scene> {
 
     // Collect non-empty tokens separated by arbitrary \t or spaces
     // but ignore the rest of the line if we encounter a #
-    let tokens = space_tab_re.split(line_str.trim())
+    let tokens = SPACE_TAB_RE.split(line_str.trim())
       .take_while(|&s| !s.starts_with("#"))
       .filter(|&s| !s.is_empty())
       .collect::<Vec<&str>>();

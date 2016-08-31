@@ -1,7 +1,6 @@
-#![feature(plugin)]
 #![feature(step_by)]
 
-#![plugin(regex_macros)]
+#[macro_use] extern crate lazy_static;
 extern crate regex;
 extern crate core;
 extern crate gl;

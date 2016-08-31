@@ -19,5 +19,5 @@ git = "https://github.com/bjz/glfw-rs"
 
 [dependencies]
 regex = "0.1.73"
-regex_macros = "0.1.38"
+lazy_static = "0.2.1"
 rand = "0.3.14"
