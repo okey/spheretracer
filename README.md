@@ -7,10 +7,14 @@ Spheres are currently the only available primitive type, and illumination uses t
 It supports supersampled antialiasing, random light sampling (soft shadows), and reflective sufaces.
 
 ### Running the tracer
-- Build and test spheretracer using Cargo
+- Install a rustc nightly (1.27 or newer, as of 2018-07-19) and cargo
+- Build and test spheretracer using `cargo test`
 - Run it with `cargo run path/to/scenefile.txt`
+- When Rust 1.28 stable is released it will finally be usable with a stable rustc.
 
 ### Scene files
+This format is daft, and only used because it is compatible with another project I worked on.
+
 Take a look at some [examples](examples), or read on.
 
 ```
@@ -24,7 +28,7 @@ imagesize 800 600 # image size specifies the size of the image to be rendered
 background 0.2 0.4 0.6 # this is the background colour
 ambient 0.2 0.2 0.2 # this is the ambient lighting
 
-# A specify a light with light x y z r g b 
+# A specify a light with light x y z r g b
 light  0.0 0.5 1.0   1.0 1.0 1.0
 
 # A sphere of radius 0.4 positioned at the origin

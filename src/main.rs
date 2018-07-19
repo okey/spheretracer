@@ -1,4 +1,6 @@
 #![feature(step_by)]
+// almost three years later and step_by has only just gone stable in master...
+// it will be released as stable in 1.28.0 (2018-08-02)
 
 #[macro_use] extern crate lazy_static;
 extern crate regex;
