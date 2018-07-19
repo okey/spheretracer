@@ -7,4 +7,4 @@ before_install:
   - yes | sudo add-apt-repository ppa:kubuntu-ppa/backports
   - sudo apt-get update -qq
 
-install: sudo apt-get install libXxf86vm-dev cmake
+install: sudo apt-get install libxxf86vm-dev cmake
