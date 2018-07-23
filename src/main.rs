@@ -212,14 +212,13 @@ fn gl_init_and_render(scene: &scene::Scene) {
           .map(|(_, c)| (c * 255.0) as u8)
           .collect()
       );
-      match img {
-        Some(img) => {
-          match image::imageops::rotate270(&img).save("render.png") {
-            Ok(_) => println!("Wrote output image"),
-            Err(e) => eprintln!("Writing image failed: {}", e)
-          }
-        },
-        None => eprintln!("Creating image failed")
+      if let Some(img) = img {
+        match image::imageops::rotate270(&img).save("render.png") {
+          Ok(_) => println!("Wrote output image"),
+          Err(e) => eprintln!("Writing image failed: {}", e)
+        }
+      } else {
+        eprintln!("Creating image failed")
       }
       render_progress += 1; // Don't write the same image over and over
     }
