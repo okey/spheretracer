@@ -9,7 +9,7 @@ It supports supersampled antialiasing, random light sampling (soft shadows), and
 ### Running the tracer
 - Install a rustc nightly (1.27 or newer, as of 2018-07-19) and cargo
 - Build and test spheretracer using `cargo test`
-- Run it with `cargo run path/to/scenefile.txt`
+- Run it with `cargo run --release path/to/scenefile.txt`
 - When Rust 1.28 stable is released it will finally be usable with a stable rustc.
 
 ### Scene files
