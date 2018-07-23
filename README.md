@@ -65,5 +65,6 @@ Running the raytracer on this will produce: ![a nice render](examples/shadow.png
    - [ ] Allow AA and soft shadows to be specified in the scene file
 - [ ] Rewrite vector and colour macros
 - [ ] Implement space division to avoid pathlogical cases, esp. with AA and soft shadows
-- [ ] Support writing to image files
+- [x] Support writing to image files
+- [ ] Command line interface for output image file
 - [ ] Better OpenGL rendering

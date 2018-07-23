@@ -4,15 +4,6 @@ name = "spheretracer"
 version = "0.0.1"
 authors = ["Oscar <nova.invictus@gmail.com>"]
 
-#[dependencies.bmp]
-#git = "https://github.com/sondrele/rust-bmp.git"
-
-#[dependencies.gl]
-#git = "https://github.com/bjz/gl-rs"
-
-#[dependencies.glfw]
-#git = "https://github.com/bjz/glfw-rs"
-
 #[target.x86_64-pc-windows-gnu.dependencies.glfw]
 #git = "https://github.com/bjz/glfw-rs"
 #default-features = false
@@ -23,4 +14,4 @@ lazy_static = "0.2.1"
 rand = "0.3.14"
 gl = "0.10.0"
 glfw = "0.23.0"
-bmp = "0.4.0"
+image = "0.19.0"

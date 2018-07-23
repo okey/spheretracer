@@ -7,11 +7,10 @@ extern crate regex;
 extern crate core;
 extern crate gl;
 extern crate glfw;
-extern crate bmp;
 extern crate rand;
+extern crate image;
 
 use std::{env,mem,ptr};
-use std::num::Wrapping;
 use std::path::Path;
 use std::ffi::CString;
 
@@ -201,28 +200,29 @@ fn gl_init_and_render(scene: &scene::Scene) {
       chunk += 1;
     } else if render_progress == colour_data.len() {
       // If done, write the image
-      let mut img = bmp::Image::new(real_wx as u32, real_wy as u32);
-
-      for idx in (0.. colour_data.len()).step_by(COLOUR_WIDTH) {
-        let row = idx / (COLOUR_WIDTH * real_wy);
-        let old_col = (idx % (COLOUR_WIDTH * real_wy)) / COLOUR_WIDTH;
-
-        let col = (!Wrapping(old_col) + Wrapping(real_wy)).0;
-        // ^ the bmp package has flipped its y-axis, so fake negative mul with ~+1, then add y-1
-
-        img.set_pixel(row as u32, col as u32, bmp::Pixel{r: (colour_data[idx] * 255.0) as u8,
-                                                         g: (colour_data[idx + 1] * 255.0) as u8,
-                                                         b: (colour_data[idx + 2] * 255.0) as u8});
+      // N.B. x and y are swapped and the image is later rotated because the image crate
+      // expects different raw data ordering compared to OpenGL/DirectX
+      // TODO handle colour width better...
+      let img = image::RgbaImage::from_raw(
+        real_wy as u32, real_wx as u32,
+        colour_data
+          .iter()
+          .enumerate()
+          //.filter(|(n, _)| (n + 1) % COLOUR_WIDTH != 0) // RGB
+          .map(|(_, c)| (c * 255.0) as u8)
+          .collect()
+      );
+      match img {
+        Some(img) => {
+          match image::imageops::rotate270(&img).save("render.png") {
+            Ok(_) => println!("Wrote output image"),
+            Err(e) => eprintln!("Writing image failed: {}", e)
+          }
+        },
+        None => eprintln!("Creating image failed")
       }
-      match img.save("render.bmp") {
-        Ok(_) => println!("Output image written to file"),
-        Err(_) => println!("Writing to image file failed")
-      }
-
       render_progress += 1; // Don't write the same image over and over
     }
-
-
 
     // cbo is still bound from setup
     unsafe {
