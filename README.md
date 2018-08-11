@@ -27,7 +27,7 @@ imagesize 800 600 # image size specifies the size of the image to be rendered
 background 0.2 0.4 0.6 # this is the background colour
 ambient 0.2 0.2 0.2 # this is the ambient lighting
 
-# A specify a light with light x y z r g b
+# Specify a light with light x y z r g b
 light  0.0 0.5 1.0   1.0 1.0 1.0
 
 # A sphere of radius 0.4 positioned at the origin
