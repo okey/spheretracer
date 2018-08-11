@@ -7,10 +7,9 @@ Spheres are currently the only available primitive type, and illumination uses t
 It supports supersampled antialiasing, random light sampling (soft shadows), and reflective sufaces.
 
 ### Running the tracer
-- Install a rustc nightly (1.27 or newer, as of 2018-07-19) and cargo
+- Install rustc stable (1.28 or newer) and cargo
 - Build and test spheretracer using `cargo test`
 - Run it with `cargo run --release path/to/scenefile.txt`
-- When Rust 1.28 stable is released it will finally be usable with a stable rustc.
 
 ### Scene files
 This format is daft, and only used because it is compatible with another project I worked on.
